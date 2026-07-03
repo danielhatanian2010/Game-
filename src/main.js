@@ -3,7 +3,7 @@
 import { Renderer } from './render.js';
 import { Input } from './input.js';
 import { AudioManager } from './audio.js';
-import { Progression, UPGRADE_DEFS } from './progression.js';
+import { Progression } from './progression.js';
 import { Game } from './game.js';
 import { HEROES, HERO_ORDER } from './heroes.js';
 
@@ -34,6 +34,7 @@ function show(id) {
 
 function $(id) { return document.getElementById(id); }
 function intelStr() { return '⬡ ' + progression.data.intel; }
+function clampFrac(v, max) { return max > 0 ? Math.max(0, Math.min(1, v / max)) : 0; }
 
 // ---------- Resize ----------
 function resize() { renderer.resize(); }
@@ -76,7 +77,7 @@ function buildHeroes() {
       <div class="hero-info">
         <div class="hero-name">${h.name} <span class="hero-tag">${h.tag}</span></div>
         <div class="hero-desc">${h.desc}</div>
-        <div class="hero-desc" style="color:#8fa0c0">◎ ${h.ability.name} · ➤ ${h.grapple.name}</div>
+        <div class="hero-desc" style="color:#8fa0c0">◎ ${h.ability.name} · ⇱ ${h.traversal.name} · ➤ ${h.projectile.name}</div>
       </div>
       <div class="hero-cta"></div>`;
     const cta = card.querySelector('.hero-cta');
@@ -105,13 +106,31 @@ function buildHeroes() {
 }
 
 // ---------- Upgrades ----------
+// Which hero the upgrades screen is currently showing.
+let upgHeroId = null;
+
 function buildUpgrades() {
   $('upg-intel').textContent = intelStr();
+  if (!upgHeroId || !progression.isUnlocked(upgHeroId)) upgHeroId = progression.data.selectedHero;
+
+  // Hero tabs (only unlocked heroes can be upgraded).
+  const tabs = $('upg-tabs');
+  tabs.innerHTML = '';
+  for (const id of HERO_ORDER) {
+    const h = HEROES[id];
+    const unlocked = progression.isUnlocked(id);
+    const tab = document.createElement('div');
+    tab.className = 'hero-tab' + (id === upgHeroId ? ' active' : '') + (unlocked ? '' : ' locked');
+    tab.textContent = h.name;
+    if (unlocked) tab.onclick = () => { audio.ui(); upgHeroId = id; buildUpgrades(); };
+    tabs.appendChild(tab);
+  }
+
+  const hero = HEROES[upgHeroId];
   const list = $('upg-list');
   list.innerHTML = '';
-  for (const key of Object.keys(UPGRADE_DEFS)) {
-    const def = UPGRADE_DEFS[key];
-    const lvl = progression.upgradeLevel(key);
+  for (const def of hero.upgrades) {
+    const lvl = progression.upgradeLevel(upgHeroId, def.key);
     const maxed = lvl >= def.max;
     const cost = maxed ? 0 : def.cost(lvl);
     const card = document.createElement('div');
@@ -134,7 +153,7 @@ function buildUpgrades() {
       b.textContent = '⬡' + cost;
       const afford = progression.data.intel >= cost;
       b.disabled = !afford; if (!afford) b.style.opacity = 0.5;
-      b.onclick = () => { if (progression.buyUpgrade(key)) { audio.gadget(); buildUpgrades(); } else audio.lose(); };
+      b.onclick = () => { if (progression.buyUpgrade(upgHeroId, def.key)) { audio.gadget(); buildUpgrades(); } else audio.lose(); };
       cta.appendChild(b);
     }
     list.appendChild(card);
@@ -149,10 +168,14 @@ function startGame(level) {
   game = new Game({ input, audio, renderer, progression, heroId: progression.data.selectedHero, level });
   renderer.cam.x = game.player.x - renderer.vw / 2;
   renderer.cam.y = game.player.y - renderer.vh / 2;
-  // Configure ability/gadget labels.
+  // Configure action button labels + glyphs for this hero.
   const hero = HEROES[progression.data.selectedHero];
-  $('ability-lbl').textContent = hero.ability.name.split(' ')[0];
-  $('grapple-lbl').textContent = hero.grapple.name.split(' ')[0];
+  const abilityShort = { radar: 'Radar', smoke: 'Smoke', webtrap: 'Trap' };
+  const weaponShort = { billyclub: 'Club', batarang: 'Batarang', web: 'Web' };
+  $('ability-lbl').textContent = abilityShort[hero.ability.type] || hero.ability.name;
+  $('jump-lbl').textContent = hero.traversal.type === 'grapple' ? 'Grapple' : 'Web Zip';
+  $('jump-glyph').textContent = hero.traversal.type === 'grapple' ? '⇱' : '➰';
+  $('grapple-lbl').textContent = weaponShort[hero.projectile.type] || hero.projectile.name;
   $('hud-hero').textContent = hero.name;
   $('hud-level').textContent = 'Sector ' + level;
   show('game');
@@ -171,13 +194,11 @@ function updateHUD(dt) {
   alarmLbl.textContent = game.alarm > 0.66 ? 'ALARM' : game.alarm > 0.15 ? 'ALERT' : 'CALM';
   alarmLbl.style.color = game.alarm > 0.66 ? 'var(--danger)' : game.alarm > 0.15 ? 'var(--warn)' : 'var(--dim)';
 
-  // Cooldown rings.
-  const mods = progression.mods();
-  const hero = game.player.hero;
-  const aMax = hero.ability.cooldown * mods.cooldownMult;
-  const gMax = hero.grapple.cooldown * mods.cooldownMult;
-  $('cd-ability').style.transform = `scaleY(${game.player.cdAbility / aMax})`;
-  $('cd-grapple').style.transform = `scaleY(${game.player.cdGrapple / gMax})`;
+  // Cooldown rings (read straight from the player's timers).
+  const pl = game.player;
+  $('cd-ability').style.transform = `scaleY(${clampFrac(pl.cdAbility, pl.abilityMax)})`;
+  $('cd-jump').style.transform = `scaleY(${clampFrac(pl.cdTraverse, pl.traverseMax)})`;
+  $('cd-grapple').style.transform = `scaleY(${clampFrac(pl.cdProjectile, pl.projectileMax)})`;
 
   // Detection warning.
   const spotted = game.enemies.some((e) => !e.downed && (e.state === 'Combat' || e.state === 'Alerted') && e.canSeePlayer);

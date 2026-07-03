@@ -30,9 +30,9 @@
     <!-- Right-side action buttons -->
     <div class="controls">
       <button class="ctrl-btn attack" id="btn-attack"><span class="glyph">✦</span><span class="lbl">Takedown</span></button>
-      <button class="ctrl-btn jump" id="btn-jump"><span class="glyph">⤴</span><span class="lbl">Dash</span></button>
+      <button class="ctrl-btn jump" id="btn-jump"><span class="glyph" id="jump-glyph">⇱</span><span class="lbl" id="jump-lbl">Grapple</span><span class="cd" id="cd-jump"></span></button>
       <button class="ctrl-btn ability" id="btn-ability"><span class="glyph">◎</span><span class="lbl" id="ability-lbl">Ability</span><span class="cd" id="cd-ability"></span></button>
-      <button class="ctrl-btn grapple" id="btn-grapple"><span class="glyph">➤</span><span class="lbl" id="grapple-lbl">Gadget</span><span class="cd" id="cd-grapple"></span></button>
+      <button class="ctrl-btn grapple" id="btn-grapple"><span class="glyph">➤</span><span class="lbl" id="grapple-lbl">Weapon</span><span class="cd" id="cd-grapple"></span></button>
     </div>
   </div>
 
@@ -65,6 +65,7 @@
   <!-- Upgrades -->
   <div id="upgrades" class="screen hidden">
     <div class="screen-head"><button class="btn back" data-back>‹ Back</button><h2>UPGRADES</h2><div class="intel-tag" id="upg-intel">⬡ 0</div></div>
+    <div class="hero-tabs" id="upg-tabs"></div>
     <div class="upg-list" id="upg-list"></div>
   </div>
 
@@ -74,9 +75,10 @@
     <div class="how-body">
       <p><b>Goal:</b> eliminate every enemy in the sector, then reach the glowing <b>EXTRACT</b> pad.</p>
       <p><b>Move:</b> touch and drag anywhere on the left of the screen — a joystick appears.</p>
-      <p><b>Takedown ✦:</b> get close to an enemy and tap. From behind it's silent; from the front it's risky.</p>
-      <p><b>Dash ⤴:</b> quick burst to vault gaps and dodge.</p>
-      <p><b>Ability ◎ / Gadget ➤:</b> hero-specific. Watch the cooldown ring.</p>
+      <p><b>Takedown ✦:</b> sneak up on an enemy and tap. It only works when the enemy <b>can't see you</b> — stay out of their cone.</p>
+      <p><b>Grapple / Web-Zip ⇱:</b> fire toward a wall to zip across the map. Warden and Nightfall grapple; Weaver web-zips.</p>
+      <p><b>Ability ◎:</b> Radar Sense, Smoke Screen, or Web Trap — hero-specific.</p>
+      <p><b>Weapon ➤:</b> Warden's ricocheting billy clubs, Nightfall's returning batarang, or Weaver's web shot. Watch the cooldown ring.</p>
       <p><b>Stealth:</b> stay out of the yellow vision cones and out of the light. Cones turn <span style="color:#ffb020">orange</span> when suspicious and <span style="color:#ff5050">red</span> when you're spotted. Get shot and your HP drops — lose it all and the mission fails.</p>
       <p><b>Sound:</b> footsteps and loud takedowns can be heard. Move deliberately.</p>
       <p>Desktop: WASD move, J takedown, Space dash, K ability, L gadget.</p>

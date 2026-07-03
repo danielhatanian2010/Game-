@@ -105,6 +105,10 @@ html, body {
 .badge.cost { background: rgba(107,208,255,0.14); color: var(--accent-2); }
 
 /* ---------- Upgrades ---------- */
+.hero-tabs { width: min(560px, 94vw); display: flex; gap: 8px; margin-bottom: 4px; }
+.hero-tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); color: var(--dim); font-weight: 800; font-size: 13px; letter-spacing: 1px; cursor: pointer; text-align: center; }
+.hero-tab.active { color: var(--text); border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2); }
+.hero-tab.locked { opacity: 0.4; }
 .upg-card { padding: 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
 .upg-info { flex: 1; }
 .upg-name { font-weight: 800; }
@@ -211,9 +215,9 @@ html, body {
     <!-- Right-side action buttons -->
     <div class="controls">
       <button class="ctrl-btn attack" id="btn-attack"><span class="glyph">✦</span><span class="lbl">Takedown</span></button>
-      <button class="ctrl-btn jump" id="btn-jump"><span class="glyph">⤴</span><span class="lbl">Dash</span></button>
+      <button class="ctrl-btn jump" id="btn-jump"><span class="glyph" id="jump-glyph">⇱</span><span class="lbl" id="jump-lbl">Grapple</span><span class="cd" id="cd-jump"></span></button>
       <button class="ctrl-btn ability" id="btn-ability"><span class="glyph">◎</span><span class="lbl" id="ability-lbl">Ability</span><span class="cd" id="cd-ability"></span></button>
-      <button class="ctrl-btn grapple" id="btn-grapple"><span class="glyph">➤</span><span class="lbl" id="grapple-lbl">Gadget</span><span class="cd" id="cd-grapple"></span></button>
+      <button class="ctrl-btn grapple" id="btn-grapple"><span class="glyph">➤</span><span class="lbl" id="grapple-lbl">Weapon</span><span class="cd" id="cd-grapple"></span></button>
     </div>
   </div>
 
@@ -246,6 +250,7 @@ html, body {
   <!-- Upgrades -->
   <div id="upgrades" class="screen hidden">
     <div class="screen-head"><button class="btn back" data-back>‹ Back</button><h2>UPGRADES</h2><div class="intel-tag" id="upg-intel">⬡ 0</div></div>
+    <div class="hero-tabs" id="upg-tabs"></div>
     <div class="upg-list" id="upg-list"></div>
   </div>
 
@@ -255,9 +260,10 @@ html, body {
     <div class="how-body">
       <p><b>Goal:</b> eliminate every enemy in the sector, then reach the glowing <b>EXTRACT</b> pad.</p>
       <p><b>Move:</b> touch and drag anywhere on the left of the screen — a joystick appears.</p>
-      <p><b>Takedown ✦:</b> get close to an enemy and tap. From behind it's silent; from the front it's risky.</p>
-      <p><b>Dash ⤴:</b> quick burst to vault gaps and dodge.</p>
-      <p><b>Ability ◎ / Gadget ➤:</b> hero-specific. Watch the cooldown ring.</p>
+      <p><b>Takedown ✦:</b> sneak up on an enemy and tap. It only works when the enemy <b>can't see you</b> — stay out of their cone.</p>
+      <p><b>Grapple / Web-Zip ⇱:</b> fire toward a wall to zip across the map. Warden and Nightfall grapple; Weaver web-zips.</p>
+      <p><b>Ability ◎:</b> Radar Sense, Smoke Screen, or Web Trap — hero-specific.</p>
+      <p><b>Weapon ➤:</b> Warden's ricocheting billy clubs, Nightfall's returning batarang, or Weaver's web shot. Watch the cooldown ring.</p>
       <p><b>Stealth:</b> stay out of the yellow vision cones and out of the light. Cones turn <span style="color:#ffb020">orange</span> when suspicious and <span style="color:#ff5050">red</span> when you're spotted. Get shot and your HP drops — lose it all and the mission fails.</p>
       <p><b>Sound:</b> footsteps and loud takedowns can be heard. Move deliberately.</p>
       <p>Desktop: WASD move, J takedown, Space dash, K ability, L gadget.</p>
@@ -351,94 +357,74 @@ function now() {
 
 
 /* ===== src/heroes.js ===== */
-// Hero definitions. Each hero shares the same base stealth kit (movement +
-// contextual takedown) but has a distinct ABILITY and GRAPPLE-slot power plus
-// a signature color. Abilities are original takes, not licensed characters.
+// Hero definitions. Each hero has three action slots:
+//   ability   (◎) — hero power (radar / smoke / web trap)
+//   traversal (⤴) — movement tool (grapple hook / web zip)   [replaces old dash]
+//   projectile(➤) — signature thrown weapon (billy club / batarang / web shot)
+// plus its own upgrade tree. Designs are original homages, not licensed art.
 
 const HEROES = {
   daredevil: {
     id: 'daredevil',
     name: 'Warden',
     tag: 'The Fearless',
-    color: '#e23b3b',
+    spriteKind: 'daredevil',
+    color: '#d02a2a',
     accent: '#ff6b6b',
-    desc: 'Blind vigilante. Radar Sense reveals foes through walls; a thrown baton stuns at range.',
+    desc: 'Blind vigilante. Radar Sense reveals foes through walls; ricocheting billy clubs bounce between them.',
     speed: 172,
     unlockCost: 0,
-    ability: {
-      name: 'Radar Sense',
-      key: 'ability',
-      cooldown: 9,
-      // Reveal all enemies through walls for a short window.
-      type: 'radar',
-      duration: 4,
-    },
-    grapple: {
-      name: 'Baton Throw',
-      key: 'grapple',
-      cooldown: 3,
-      // Ranged stun in facing direction.
-      type: 'throw',
-      range: 360,
-      stun: 3.5,
-    },
+    ability: { name: 'Radar Sense', type: 'radar', cooldown: 9, duration: 4 },
+    traversal: { name: 'Grapple Hook', type: 'grapple', cooldown: 3.5, range: 340, speed: 1050 },
+    projectile: { name: 'Billy Club', type: 'billyclub', cooldown: 3.2, range: 900, speed: 560, bounces: 3 },
+    upgrades: [
+      { key: 'clubCount', name: 'Double Billy Clubs', desc: 'Throw an extra club in a fan', max: 2, cost: (l) => 90 + l * 90 },
+      { key: 'clubBounce', name: 'Ricochet Mastery', desc: '+1 wall/enemy bounce per level', max: 2, cost: (l) => 80 + l * 70 },
+      { key: 'radarDur', name: 'Heightened Senses', desc: 'Radar Sense lasts longer', max: 3, cost: (l) => 70 + l * 55 },
+      { key: 'grappleCd', name: 'Swift Line', desc: 'Grapple recharges faster', max: 3, cost: (l) => 75 + l * 60 },
+    ],
   },
 
   bat: {
     id: 'bat',
     name: 'Nightfall',
     tag: 'The Shadow',
-    color: '#3a5bd9',
+    spriteKind: 'bat',
+    color: '#2b3350',
     accent: '#7aa0ff',
-    desc: 'Caped detective. Drop a smoke screen to break line-of-sight; batarangs stun at range.',
+    desc: 'Caped detective. Smoke breaks line-of-sight; the batarang seeks a target, strikes, and returns.',
     speed: 165,
     unlockCost: 120,
-    ability: {
-      name: 'Smoke Screen',
-      key: 'ability',
-      cooldown: 11,
-      // Blinds enemies whose sightline crosses the cloud; hides player.
-      type: 'smoke',
-      radius: 150,
-      duration: 5,
-    },
-    grapple: {
-      name: 'Batarang',
-      key: 'grapple',
-      cooldown: 2.5,
-      type: 'throw',
-      range: 420,
-      stun: 3,
-    },
+    ability: { name: 'Smoke Screen', type: 'smoke', cooldown: 11, radius: 150, duration: 5 },
+    traversal: { name: 'Grapple Hook', type: 'grapple', cooldown: 3.5, range: 360, speed: 1050 },
+    projectile: { name: 'Batarang', type: 'batarang', cooldown: 3, range: 520, speed: 620, targets: 1 },
+    upgrades: [
+      { key: 'batTargets', name: 'Twin Batarang', desc: 'Batarang strikes an extra target', max: 2, cost: (l) => 95 + l * 90 },
+      { key: 'smokeSize', name: 'Thick Smoke', desc: 'Bigger, longer smoke screen', max: 3, cost: (l) => 70 + l * 55 },
+      { key: 'grappleCd', name: 'Grapple Tune', desc: 'Grapple recharges faster', max: 3, cost: (l) => 75 + l * 60 },
+      { key: 'intimidate', name: 'Intimidation', desc: 'Enemies notice you slower', max: 3, cost: (l) => 80 + l * 60 },
+    ],
   },
 
   spider: {
     id: 'spider',
     name: 'Weaver',
     tag: 'The Silk',
-    color: '#c33bd9',
+    spriteKind: 'spider',
+    color: '#b02fd0',
     accent: '#e07bff',
-    desc: 'Wall-crawler. Web-zip dashes across the arena; web traps root patrolling foes.',
+    desc: 'Wall-crawler. Web-zip dashes across the arena; web shots take down foes at range and web traps root patrols.',
     speed: 178,
     unlockCost: 200,
-    ability: {
-      name: 'Web Trap',
-      key: 'ability',
-      cooldown: 7,
-      // Places a sticky node; first enemy to touch it is rooted.
-      type: 'webtrap',
-      duration: 6,
-      rootTime: 4,
-    },
-    grapple: {
-      name: 'Web Zip',
-      key: 'grapple',
-      cooldown: 2,
-      // Fast dash in facing direction (stops at walls).
-      type: 'zip',
-      range: 300,
-      speed: 900,
-    },
+    ability: { name: 'Web Trap', type: 'webtrap', cooldown: 7, duration: 6, rootTime: 4, radius: 34 },
+    traversal: { name: 'Web Zip', type: 'zip', cooldown: 2, range: 320, speed: 950 },
+    projectile: { name: 'Web Shot', type: 'web', cooldown: 2.4, range: 560, speed: 720 },
+    upgrades: [
+      { key: 'webCount', name: 'Twin Web Shot', desc: 'Fire an extra web strand', max: 2, cost: (l) => 90 + l * 90 },
+      { key: 'trapSize', name: 'Wide Web', desc: 'Larger trap, longer root', max: 3, cost: (l) => 70 + l * 55 },
+      { key: 'zipRange', name: 'Long Line', desc: 'Web-zip reaches farther', max: 3, cost: (l) => 75 + l * 60 },
+      { key: 'agility', name: 'Spider Agility', desc: 'Move a little faster', max: 3, cost: (l) => 85 + l * 65 },
+    ],
   },
 };
 
@@ -446,17 +432,19 @@ const HERO_ORDER = ['daredevil', 'bat', 'spider'];
 
 
 /* ===== src/mapgen.js ===== */
-// Procedural stealth-arena generator. Produces a compact grid of rooms/alleys
-// connected by corridors, wrapped in walls, with props, light pools, an
-// extraction pad, and floor "zones" (street / roof / interior) for theming.
+// Procedural stealth-compound generator. Rooms themed by zone, joined by
+// narrow doorways/corridors for a "compound" feel, wrapped in walls, dressed
+// with blocking props (crates, barrels, desks, lockers) and non-blocking
+// decorations (rugs, puddles, grates, plants) plus lamp light pools and an
+// extraction pad placed far from the player spawn.
 
 
-const TILE = 56; // world pixels per grid cell
+const TILE = 56;
+const VOID = 0;
+const FLOOR = 1;
+const WALL = 2;
 
-// Cell types
-const VOID = 0;   // outside the play area (blocking, dark)
-const FLOOR = 1;  // walkable
-const WALL = 2;   // blocking, blocks vision
+const BLOCKING_PROPS = new Set(['crate', 'barrel', 'desk', 'locker']);
 
 class GameMap {
   constructor(seed, level) {
@@ -464,17 +452,18 @@ class GameMap {
     this.level = level;
     this.rng = makeRng(seed);
 
-    // Grow the arena slightly with level, capped for readability.
-    this.cols = Math.min(16 + Math.floor(level / 2), 24);
-    this.rows = Math.min(20 + Math.floor(level / 2), 30);
+    // Larger arenas so patrols spread out; capped for readability.
+    this.cols = Math.min(20 + Math.floor(level / 2), 30);
+    this.rows = Math.min(24 + Math.floor(level / 2), 36);
 
     this.cells = [];
-    this.zones = [];   // per-cell theme: 'street' | 'roof' | 'interior'
-    this.props = [];   // { gx, gy, type } lamps, crates, poles, plants
-    this.floorTiles = []; // list of {gx,gy} walkable cells
+    this.zones = [];
+    this.props = [];
+    this.decos = [];       // non-blocking floor decoration {gx,gy,type}
+    this.floorTiles = [];
     this.rooms = [];
-    this.lights = [];  // { x, y, r } world-space light pools
-    this.extract = null; // { gx, gy }
+    this.lights = [];
+    this.extract = null;
 
     this._generate();
   }
@@ -482,144 +471,143 @@ class GameMap {
   idx(gx, gy) { return gy * this.cols + gx; }
   inBounds(gx, gy) { return gx >= 0 && gy >= 0 && gx < this.cols && gy < this.rows; }
   cellAt(gx, gy) { return this.inBounds(gx, gy) ? this.cells[this.idx(gx, gy)] : WALL; }
-
   worldWidth() { return this.cols * TILE; }
   worldHeight() { return this.rows * TILE; }
 
-  // Is a world-space point blocked (wall/void)?
   isBlockedWorld(x, y) {
     const gx = Math.floor(x / TILE), gy = Math.floor(y / TILE);
     return this.cellAt(gx, gy) !== FLOOR;
   }
-
-  isWallCell(gx, gy) {
-    return this.cellAt(gx, gy) === WALL;
-  }
+  isWallCell(gx, gy) { return this.cellAt(gx, gy) === WALL; }
 
   _generate() {
     const N = this.cols * this.rows;
     this.cells = new Array(N).fill(VOID);
     this.zones = new Array(N).fill('street');
 
-    // Carve 4..7 rectangular rooms.
-    const roomCount = randInt(this.rng, 4, 7);
+    // Rooms.
+    const roomCount = randInt(this.rng, 5, 9);
     let attempts = 0;
-    while (this.rooms.length < roomCount && attempts < 60) {
+    while (this.rooms.length < roomCount && attempts < 90) {
       attempts++;
-      const w = randInt(this.rng, 4, 7);
-      const h = randInt(this.rng, 4, 7);
+      const w = randInt(this.rng, 4, 8);
+      const h = randInt(this.rng, 4, 8);
       const x = randInt(this.rng, 1, this.cols - w - 1);
       const y = randInt(this.rng, 1, this.rows - h - 1);
       const room = { x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1) };
-      // Allow gentle overlap but avoid full duplicates.
       let ok = true;
-      for (const r of this.rooms) {
-        if (Math.abs(r.cx - room.cx) < 3 && Math.abs(r.cy - room.cy) < 3) { ok = false; break; }
-      }
+      for (const r of this.rooms) if (Math.abs(r.cx - room.cx) < 3 && Math.abs(r.cy - room.cy) < 3) { ok = false; break; }
       if (!ok) continue;
-      const zone = pick(this.rng, ['street', 'interior', 'roof', 'street']);
-      this._carveRoom(room, zone);
+      room.zone = pick(this.rng, ['interior', 'interior', 'street', 'roof']);
+      this._carveRoom(room);
       this.rooms.push(room);
     }
 
-    // Connect rooms with L-shaped corridors (in order for a connected graph).
-    for (let i = 1; i < this.rooms.length; i++) {
-      const a = this.rooms[i - 1], b = this.rooms[i];
-      this._carveCorridor(a.cx, a.cy, b.cx, b.cy);
-    }
-    // A couple of extra links for looping routes (better patrols).
+    // Connect rooms with narrow (1-wide) corridors for a compound feel.
+    for (let i = 1; i < this.rooms.length; i++) this._carveCorridor(this.rooms[i - 1], this.rooms[i]);
     for (let k = 0; k < 2 && this.rooms.length > 2; k++) {
       const a = pick(this.rng, this.rooms), b = pick(this.rng, this.rooms);
-      if (a !== b) this._carveCorridor(a.cx, a.cy, b.cx, b.cy);
+      if (a !== b) this._carveCorridor(a, b);
     }
 
-    // Wall pass: any VOID cell orthogonally/diagonally adjacent to FLOOR becomes WALL.
-    for (let gy = 0; gy < this.rows; gy++) {
+    // Wall pass.
+    for (let gy = 0; gy < this.rows; gy++)
       for (let gx = 0; gx < this.cols; gx++) {
         if (this.cells[this.idx(gx, gy)] !== VOID) continue;
-        let touchFloor = false;
-        for (let dy = -1; dy <= 1 && !touchFloor; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            if (this.cellAt(gx + dx, gy + dy) === FLOOR) { touchFloor = true; break; }
-          }
-        if (touchFloor) this.cells[this.idx(gx, gy)] = WALL;
+        let touch = false;
+        for (let dy = -1; dy <= 1 && !touch; dy++)
+          for (let dx = -1; dx <= 1; dx++)
+            if (this.cellAt(gx + dx, gy + dy) === FLOOR) { touch = true; break; }
+        if (touch) this.cells[this.idx(gx, gy)] = WALL;
       }
-    }
 
-    // Collect floor tiles.
     for (let gy = 0; gy < this.rows; gy++)
       for (let gx = 0; gx < this.cols; gx++)
         if (this.cells[this.idx(gx, gy)] === FLOOR) this.floorTiles.push({ gx, gy });
 
+    this._placeDecos();
     this._placeProps();
     this._placeExtract();
   }
 
-  _carveRoom(room, zone) {
+  _carveRoom(room) {
     for (let y = room.y; y < room.y + room.h; y++)
       for (let x = room.x; x < room.x + room.w; x++) {
         if (!this.inBounds(x, y)) continue;
         this.cells[this.idx(x, y)] = FLOOR;
-        this.zones[this.idx(x, y)] = zone;
+        this.zones[this.idx(x, y)] = room.zone;
       }
   }
 
-  _carveCorridor(x0, y0, x1, y1) {
-    const horizFirst = this.rng() < 0.5;
+  _carveCorridor(a, b) {
     const carve = (x, y) => {
       if (!this.inBounds(x, y)) return;
-      if (this.cells[this.idx(x, y)] === VOID) {
-        this.cells[this.idx(x, y)] = FLOOR;
-        this.zones[this.idx(x, y)] = 'street';
-      }
+      if (this.cells[this.idx(x, y)] === VOID) { this.cells[this.idx(x, y)] = FLOOR; this.zones[this.idx(x, y)] = 'street'; }
     };
-    if (horizFirst) {
-      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) { carve(x, y0); carve(x, y0 + 1); }
-      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) { carve(x1, y); carve(x1 + 1, y); }
+    let x = a.cx, y = a.cy;
+    if (this.rng() < 0.5) {
+      for (; x !== b.cx; x += Math.sign(b.cx - x)) carve(x, y);
+      for (; y !== b.cy; y += Math.sign(b.cy - y)) carve(x, y);
     } else {
-      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) { carve(x0, y); carve(x0 + 1, y); }
-      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) { carve(x, y1); carve(x, y1 + 1); }
+      for (; y !== b.cy; y += Math.sign(b.cy - y)) carve(x, y);
+      for (; x !== b.cx; x += Math.sign(b.cx - x)) carve(x, y);
+    }
+  }
+
+  _placeDecos() {
+    // Rugs in interior rooms.
+    for (const r of this.rooms) {
+      if (r.zone === 'interior' && r.w >= 5 && r.h >= 5 && this.rng() < 0.7) {
+        for (let y = r.y + 1; y < r.y + r.h - 1; y++)
+          for (let x = r.x + 1; x < r.x + r.w - 1; x++)
+            this.decos.push({ gx: x, gy: y, type: 'rug' });
+      }
+    }
+    // Puddles + grates + cracks scattered on floor for texture.
+    const n = 10 + Math.floor(this.rng() * 14);
+    for (let i = 0; i < n; i++) {
+      const t = this.floorTiles[Math.floor(this.rng() * this.floorTiles.length)];
+      if (!t) break;
+      const type = pick(this.rng, ['puddle', 'puddle', 'grate', 'crack']);
+      this.decos.push({ gx: t.gx, gy: t.gy, type });
     }
   }
 
   _placeProps() {
     const used = new Set();
-    const claim = (gx, gy) => { used.add(gx + ',' + gy); };
+    const claim = (gx, gy) => used.add(gx + ',' + gy);
     const isUsed = (gx, gy) => used.has(gx + ',' + gy);
 
-    // Street lamps -> light pools. One per room-ish plus some scattered.
-    const lampCount = 3 + Math.floor(this.rng() * 3);
+    // Lamps -> light pools.
+    const lampCount = 4 + Math.floor(this.rng() * 4);
     for (let i = 0; i < lampCount; i++) {
       const r = pick(this.rng, this.rooms);
       if (!r) break;
-      const gx = r.cx + randInt(this.rng, -1, 1);
-      const gy = r.cy + randInt(this.rng, -1, 1);
+      const gx = r.cx + randInt(this.rng, -1, 1), gy = r.cy + randInt(this.rng, -1, 1);
       if (this.cellAt(gx, gy) !== FLOOR || isUsed(gx, gy)) continue;
       claim(gx, gy);
       this.props.push({ gx, gy, type: 'lamp' });
       this.lights.push({ x: (gx + 0.5) * TILE, y: (gy + 0.5) * TILE, r: TILE * 2.4 });
     }
 
-    // Crates (blockers) and plants / poles (cover, non-blocking visuals).
-    const clutter = 4 + Math.floor(this.rng() * 5) + this.level;
+    // Blocking + decorative clutter.
+    const clutter = 8 + Math.floor(this.rng() * 6) + this.level;
     for (let i = 0; i < clutter; i++) {
       const t = pick(this.rng, this.floorTiles);
       if (!t || isUsed(t.gx, t.gy)) continue;
-      const type = pick(this.rng, ['crate', 'crate', 'pole', 'plant']);
+      const zone = this.zones[this.idx(t.gx, t.gy)];
+      const pool = zone === 'interior'
+        ? ['desk', 'locker', 'crate', 'plant', 'barrel']
+        : ['crate', 'barrel', 'barrel', 'pole', 'plant'];
+      const type = pick(this.rng, pool);
       claim(t.gx, t.gy);
       this.props.push({ gx: t.gx, gy: t.gy, type });
-      if (type === 'crate') {
-        // Crates block movement + vision like low walls.
-        this.cells[this.idx(t.gx, t.gy)] = WALL;
-        this.zones[this.idx(t.gx, t.gy)] = 'crate';
-      }
+      if (BLOCKING_PROPS.has(type)) { this.cells[this.idx(t.gx, t.gy)] = WALL; this.zones[this.idx(t.gx, t.gy)] = 'prop_' + type; }
     }
-    // Refresh floor list (crates removed some).
     this.floorTiles = this.floorTiles.filter((t) => this.cells[this.idx(t.gx, t.gy)] === FLOOR);
   }
 
   _placeExtract() {
-    // Extraction pad far from map center for a bit of routing.
     let best = null, bestD = -1;
     const cx = this.cols / 2, cy = this.rows / 2;
     for (const t of this.floorTiles) {
@@ -629,9 +617,8 @@ class GameMap {
     this.extract = best ? { gx: best.gx, gy: best.gy } : this.floorTiles[0];
   }
 
-  // A random walkable world position, optionally far from (x,y).
   randomFloorPos(minDistFrom = null, minDist = 0) {
-    for (let tries = 0; tries < 40; tries++) {
+    for (let tries = 0; tries < 60; tries++) {
       const t = this.floorTiles[Math.floor(this.rng() * this.floorTiles.length)];
       const wx = (t.gx + 0.5) * TILE, wy = (t.gy + 0.5) * TILE;
       if (!minDistFrom || Math.hypot(wx - minDistFrom.x, wy - minDistFrom.y) >= minDist)
@@ -644,7 +631,8 @@ class GameMap {
   zoneAtWorld(x, y) {
     const gx = Math.floor(x / TILE), gy = Math.floor(y / TILE);
     if (!this.inBounds(gx, gy)) return 'street';
-    return this.zones[this.idx(gx, gy)] || 'street';
+    const z = this.zones[this.idx(gx, gy)] || 'street';
+    return z.startsWith('prop_') ? 'interior' : z;
   }
 }
 
@@ -713,104 +701,98 @@ function reconstruct(came, endK, cols) {
 
 
 /* ===== src/progression.js ===== */
-// Persistent progression via localStorage: unlocked heroes, currency (Intel),
-// permanent upgrades, and best level reached.
+// Persistent progression via localStorage: unlocked heroes, Intel currency,
+// per-hero upgrade levels, and best sector reached.
 
 
-const KEY = 'nightfall_save_v1';
+const KEY = 'nightfall_save_v2';
 
-const DEFAULT = {
-  intel: 0,
-  bestLevel: 1,
-  selectedHero: 'daredevil',
-  unlocked: { daredevil: true, bat: false, spider: false },
-  upgrades: {
-    takedownSpeed: 0, // faster takedown windup
-    detection: 0,     // slower enemy suspicion buildup
-    cooldown: 0,      // faster ability cooldowns
-    speed: 0,         // move speed
-  },
-};
-
-const UPGRADE_DEFS = {
-  takedownSpeed: { name: 'Silent Hands', desc: 'Takedowns land faster', max: 4, cost: (l) => 60 + l * 50 },
-  detection: { name: 'Ghost Step', desc: 'Enemies notice you slower', max: 4, cost: (l) => 70 + l * 55 },
-  cooldown: { name: 'Field Tech', desc: 'Gadget cooldowns recharge faster', max: 4, cost: (l) => 80 + l * 60 },
-  speed: { name: 'Fleet Foot', desc: 'Move a little faster', max: 3, cost: (l) => 90 + l * 70 },
-};
+function defaultData() {
+  return {
+    intel: 0,
+    bestLevel: 1,
+    selectedHero: 'daredevil',
+    unlocked: { daredevil: true, bat: false, spider: false },
+    upgrades: { daredevil: {}, bat: {}, spider: {} }, // upgrades[hero][key] = level
+  };
+}
 
 class Progression {
-  constructor() {
-    this.data = this._load();
-  }
+  constructor() { this.data = this._load(); }
 
   _load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (!raw) return structuredClone(DEFAULT);
-      const parsed = JSON.parse(raw);
-      // Merge with defaults so new fields survive upgrades.
+      if (!raw) return defaultData();
+      const p = JSON.parse(raw);
+      const d = defaultData();
       return {
-        ...structuredClone(DEFAULT),
-        ...parsed,
-        unlocked: { ...DEFAULT.unlocked, ...(parsed.unlocked || {}) },
-        upgrades: { ...DEFAULT.upgrades, ...(parsed.upgrades || {}) },
+        ...d, ...p,
+        unlocked: { ...d.unlocked, ...(p.unlocked || {}) },
+        upgrades: {
+          daredevil: { ...(p.upgrades?.daredevil || {}) },
+          bat: { ...(p.upgrades?.bat || {}) },
+          spider: { ...(p.upgrades?.spider || {}) },
+        },
       };
-    } catch {
-      return structuredClone(DEFAULT);
-    }
+    } catch { return defaultData(); }
   }
 
-  save() {
-    try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch {}
-  }
+  save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch {} }
 
   addIntel(n) { this.data.intel += n; this.save(); }
-
   isUnlocked(id) { return !!this.data.unlocked[id]; }
 
   unlock(id) {
     const hero = HEROES[id];
-    if (!hero || this.isUnlocked(id)) return false;
-    if (this.data.intel < hero.unlockCost) return false;
+    if (!hero || this.isUnlocked(id) || this.data.intel < hero.unlockCost) return false;
     this.data.intel -= hero.unlockCost;
     this.data.unlocked[id] = true;
     this.save();
     return true;
   }
 
-  selectHero(id) {
-    if (this.isUnlocked(id)) { this.data.selectedHero = id; this.save(); }
-  }
+  selectHero(id) { if (this.isUnlocked(id)) { this.data.selectedHero = id; this.save(); } }
 
-  upgradeLevel(key) { return this.data.upgrades[key] || 0; }
+  upgradeLevel(heroId, key) { return this.data.upgrades[heroId]?.[key] || 0; }
 
-  buyUpgrade(key) {
-    const def = UPGRADE_DEFS[key];
-    const lvl = this.upgradeLevel(key);
+  buyUpgrade(heroId, key) {
+    const hero = HEROES[heroId];
+    const def = hero.upgrades.find((u) => u.key === key);
+    if (!def) return false;
+    const lvl = this.upgradeLevel(heroId, key);
     if (lvl >= def.max) return false;
     const cost = def.cost(lvl);
     if (this.data.intel < cost) return false;
     this.data.intel -= cost;
-    this.data.upgrades[key] = lvl + 1;
+    this.data.upgrades[heroId][key] = lvl + 1;
     this.save();
     return true;
   }
 
-  // Derived multipliers used by gameplay.
-  mods() {
-    const u = this.data.upgrades;
+  // Derived, gameplay-facing effect values for the given hero.
+  heroMods(heroId) {
+    const L = (k) => this.upgradeLevel(heroId, k);
     return {
-      takedownMult: 1 - u.takedownSpeed * 0.15,     // faster
-      suspicionMult: 1 - u.detection * 0.16,        // slower buildup
-      cooldownMult: 1 - u.cooldown * 0.15,          // faster recharge
-      speedMult: 1 + u.speed * 0.06,
+      // Daredevil
+      clubCount: 1 + L('clubCount'),
+      clubBounce: L('clubBounce'),
+      radarBonus: L('radarDur') * 1.5,
+      // Batman
+      batTargets: 1 + L('batTargets'),
+      smokeBonus: L('smokeSize'),        // scales radius + duration
+      // Spider
+      webCount: 1 + L('webCount'),
+      trapBonus: L('trapSize'),
+      zipBonus: L('zipRange') * 0.22,    // fractional range increase
+      // Shared-ish (still per hero)
+      grappleCd: 1 - L('grappleCd') * 0.14,
+      suspicionMult: 1 - L('intimidate') * 0.16,
+      speedMult: 1 + L('agility') * 0.05,
     };
   }
 
-  recordLevel(level) {
-    if (level > this.data.bestLevel) { this.data.bestLevel = level; this.save(); }
-  }
+  recordLevel(level) { if (level > this.data.bestLevel) { this.data.bestLevel = level; this.save(); } }
 }
 
 
@@ -1473,52 +1455,57 @@ class Enemy {
 
 
 /* ===== src/entities/player.js ===== */
-// The player-controlled hero. Handles movement + collision, facing, the
-// contextual stealth takedown, and hero abilities (radar / smoke / webtrap /
-// throw / zip). Rendering lives in render.js.
+// The player-controlled hero. Slots:
+//   attack  -> stealth takedown (only on enemies that DON'T see you)
+//   jump    -> traversal: grapple hook (Warden/Nightfall) or web-zip (Weaver)
+//   ability -> radar / smoke / web trap
+//   grapple -> signature projectile: billy club / batarang / web shot
 
 
 
 
 class Player {
-  constructor(heroId, x, y, mods) {
+  constructor(heroId, x, y, heroMods) {
     this.hero = HEROES[heroId];
-    this.x = x;
-    this.y = y;
+    this.x = x; this.y = y;
     this.radius = 15;
     this.angle = -Math.PI / 2;
-    this.mods = mods;
-    this.speed = this.hero.speed * mods.speedMult;
+    this.mods = heroMods;
+    this.speed = this.hero.speed * heroMods.speedMult;
 
     this.moving = false;
     this.footTimer = 0;
-    this.sprinting = false;
+    this.walkT = 0;      // walk cycle time -> sprite frame
+    this.frame = 0;
 
-    // Cooldown timers (seconds remaining).
+    // Cooldowns (current + max, for HUD rings).
     this.cdAbility = 0;
-    this.cdGrapple = 0;
+    this.abilityMax = this.hero.ability.cooldown;
+    this.cdTraverse = 0;
+    this.traverseMax = this.hero.traversal.cooldown * (this.hero.traversal.type === 'grapple' ? heroMods.grappleCd : 1);
+    this.cdProjectile = 0;
+    this.projectileMax = this.hero.projectile.cooldown;
 
-    // Active effects.
-    this.radarTimer = 0;   // Warden radar sense reveal
-    this.zipping = null;   // { dx, dy, remaining } active web-zip dash
-    this.takedownAnim = 0; // brief lunge animation
-
-    this.hidden = false;   // inside own smoke
-    this.detectionMeter = 0; // 0..1 aggregate exposure for the HUD ring
+    this.radarTimer = 0;
+    this.dashing = null;      // active grapple/zip { tx, ty, speed, kind }
+    this.rope = null;         // grapple rope visual { ax, ay, t }
+    this.takedownAnim = 0;
+    this.hidden = false;
+    this.detectionMeter = 0;
   }
 
   get takedownRange() { return 46; }
 
   update(dt, input, game) {
-    // Cooldowns.
     this.cdAbility = Math.max(0, this.cdAbility - dt);
-    this.cdGrapple = Math.max(0, this.cdGrapple - dt);
+    this.cdTraverse = Math.max(0, this.cdTraverse - dt);
+    this.cdProjectile = Math.max(0, this.cdProjectile - dt);
     this.radarTimer = Math.max(0, this.radarTimer - dt);
     if (this.takedownAnim > 0) this.takedownAnim = Math.max(0, this.takedownAnim - dt);
+    if (this.rope) { this.rope.t -= dt; if (this.rope.t <= 0) this.rope = null; }
 
-    // --- Movement (web-zip overrides manual control) ---
-    if (this.zipping) {
-      this._updateZip(dt, game);
+    if (this.dashing) {
+      this._updateDash(dt, game);
     } else {
       let mx = input.move.x, my = input.move.y;
       const mag = Math.hypot(mx, my);
@@ -1530,149 +1517,269 @@ class Player {
       }
     }
 
-    // Footstep audio + sound events for enemy hearing.
-    if (this.moving && !this.zipping) {
+    // Walk animation frame.
+    if (this.moving || this.dashing) { this.walkT += dt; this.frame = (Math.floor(this.walkT * 7) % 2); }
+    else { this.frame = 0; }
+
+    // Footsteps.
+    if (this.moving && !this.dashing) {
       this.footTimer -= dt;
       if (this.footTimer <= 0) {
         this.footTimer = 0.34;
         const zone = game.map.zoneAtWorld(this.x, this.y);
         game.audio.footstep(zone === 'roof' ? 'roof' : zone === 'interior' ? 'interior' : 'street');
-        // Footsteps are a small sound the enemies can hear.
         game.emitSound(this.x, this.y, TILE * 2.1, 'step');
       }
     }
 
-    // --- Actions ---
     if (input.consume('attack')) this._tryTakedown(game);
-    if (input.consume('jump')) this._parkour(game);
+    if (input.consume('jump')) this._traverse(game);
     if (input.consume('ability')) this._useAbility(game);
-    if (input.consume('grapple')) this._useGrapple(game);
+    if (input.consume('grapple')) this._throw(game);
 
-    // Am I standing inside my own smoke? (grants hidden)
-    this.hidden = game.smokes.some(
-      (s) => Math.hypot(s.x - this.x, s.y - this.y) < s.radius
-    );
+    this.hidden = game.smokes.some((s) => Math.hypot(s.x - this.x, s.y - this.y) < s.radius);
   }
 
   _moveWithCollision(dx, dy, game) {
-    const map = game.map;
-    const r = this.radius;
-    // Axis-separated so we slide along walls.
-    let nx = this.x + dx;
-    if (!this._blocked(map, nx - r, this.y) && !this._blocked(map, nx + r, this.y) &&
-        !this._blocked(map, nx, this.y - r) && !this._blocked(map, nx, this.y + r)) {
-      this.x = nx;
+    const map = game.map, r = this.radius;
+    const nx = this.x + dx;
+    if (!this._blk(map, nx - r, this.y) && !this._blk(map, nx + r, this.y) &&
+        !this._blk(map, nx, this.y - r) && !this._blk(map, nx, this.y + r)) this.x = nx;
+    const ny = this.y + dy;
+    if (!this._blk(map, this.x - r, ny) && !this._blk(map, this.x + r, ny) &&
+        !this._blk(map, this.x, ny - r) && !this._blk(map, this.x, ny + r)) this.y = ny;
+  }
+  _blk(map, x, y) { return map.isBlockedWorld(x, y); }
+
+  // --- Traversal: grapple hook or web zip. Both dash to a computed target,
+  //     stopping just short of the first wall along the facing direction. ---
+  _traverse(game) {
+    if (this.cdTraverse > 0 || this.dashing) return;
+    const t = this.hero.traversal;
+    let range = t.range;
+    if (t.type === 'zip') range *= (1 + this.mods.zipBonus);
+    const dx = Math.cos(this.angle), dy = Math.sin(this.angle);
+    const step = TILE * 0.3;
+    let lastX = this.x, lastY = this.y, r = step;
+    while (r < range) {
+      const px = this.x + dx * r, py = this.y + dy * r;
+      if (game.map.isBlockedWorld(px + dx * this.radius, py + dy * this.radius)) break;
+      lastX = px; lastY = py; r += step;
     }
-    let ny = this.y + dy;
-    if (!this._blocked(map, this.x - r, ny) && !this._blocked(map, this.x + r, ny) &&
-        !this._blocked(map, this.x, ny - r) && !this._blocked(map, this.x, ny + r)) {
-      this.y = ny;
-    }
+    if (Math.hypot(lastX - this.x, lastY - this.y) < TILE * 0.5) return; // nowhere to go, don't waste cd
+    this.cdTraverse = this.traverseMax;
+    this.dashing = { tx: lastX, ty: lastY, speed: t.speed, kind: t.type };
+    if (t.type === 'grapple') { this.rope = { ax: lastX, ay: lastY, t: 0.35 }; game.audio.gadget(); }
+    else game.audio.gadget();
+    game.emitSound(this.x, this.y, TILE * 1.6, 'step');
   }
 
-  _blocked(map, x, y) { return map.isBlockedWorld(x, y); }
-
-  _updateZip(dt, game) {
-    const z = this.zipping;
-    const step = z.speed * dt;
-    const dist = Math.min(step, z.remaining);
-    const nx = this.x + z.dx * dist;
-    const ny = this.y + z.dy * dist;
-    // Stop at walls.
-    if (game.map.isBlockedWorld(nx + z.dx * this.radius, ny + z.dy * this.radius)) {
-      this.zipping = null;
-      return;
-    }
-    this.x = nx; this.y = ny;
-    z.remaining -= dist;
-    game.spawnZipTrail(this.x, this.y);
-    if (z.remaining <= 0) this.zipping = null;
+  _updateDash(dt, game) {
+    const d = this.dashing;
+    const dxT = d.tx - this.x, dyT = d.ty - this.y;
+    const dist = Math.hypot(dxT, dyT);
+    const step = d.speed * dt;
+    if (dist <= step) { this.x = d.tx; this.y = d.ty; this.dashing = null; return; }
+    this.x += dxT / dist * step; this.y += dyT / dist * step;
+    if (d.kind === 'zip') game.spawnZipTrail(this.x, this.y);
   }
 
-  // Silent takedown if an enemy is close and (roughly) not facing us.
+  // Silent takedown only on the nearest enemy that cannot see you.
   _tryTakedown(game) {
     let best = null, bestD = 1e9;
     for (const e of game.enemies) {
       if (e.dead || e.downed) continue;
+      if (e.canSeePlayer) continue;           // must be unaware of you
       const d = Math.hypot(e.x - this.x, e.y - this.y);
       if (d > this.takedownRange || d > bestD) continue;
       best = e; bestD = d;
     }
     if (best) {
-      // Face the target and lunge.
       this.angle = Math.atan2(best.y - this.y, best.x - this.x);
-      this.takedownAnim = 0.22 * this.mods.takedownMult;
-      const fromBehind = Math.abs(angleDiff(best.angle, this.angle + Math.PI)) < 1.2;
-      // Alerted enemies facing you resist a clean takedown but still get hit;
-      // behind/unaware = instant. Either way they go down here (fast game).
+      this.takedownAnim = 0.22;
+      const fromBehind = Math.abs(angleDiff(best.angle, this.angle + Math.PI)) < 1.3;
       game.doTakedown(best, this, fromBehind);
     } else {
-      // Whiff — small lunge feedback.
-      this.takedownAnim = 0.12;
-    }
-  }
-
-  _parkour(game) {
-    // Contextual dash/vault: a short burst in facing direction if a wall or
-    // ledge is just ahead, otherwise a quick evasive hop.
-    const dashDir = this.moving ? this.angle : this.angle;
-    const dx = Math.cos(dashDir), dy = Math.sin(dashDir);
-    const burst = 46;
-    const tx = this.x + dx * burst, ty = this.y + dy * burst;
-    if (!game.map.isBlockedWorld(tx, ty)) {
-      this.x = tx; this.y = ty;
-      game.emitSound(this.x, this.y, TILE * 1.4, 'step');
+      this.takedownAnim = 0.12; // whiff
     }
   }
 
   _useAbility(game) {
     if (this.cdAbility > 0) return;
     const a = this.hero.ability;
-    this.cdAbility = a.cooldown * this.mods.cooldownMult;
+    this.cdAbility = this.abilityMax;
     game.audio.ability();
-    switch (a.type) {
-      case 'radar':
-        this.radarTimer = a.duration;
-        break;
-      case 'smoke':
-        game.spawnSmoke(this.x, this.y, a.radius, a.duration);
-        break;
-      case 'webtrap':
-        game.spawnWebTrap(this.x, this.y, a.duration, a.rootTime);
-        break;
-    }
+    if (a.type === 'radar') this.radarTimer = a.duration + this.mods.radarBonus;
+    else if (a.type === 'smoke') game.spawnSmoke(this.x, this.y, a.radius * (1 + this.mods.smokeBonus * 0.22), a.duration + this.mods.smokeBonus);
+    else if (a.type === 'webtrap') game.spawnWebTrap(this.x, this.y, a.duration, a.rootTime + this.mods.trapBonus, a.radius * (1 + this.mods.trapBonus * 0.18));
   }
 
-  _useGrapple(game) {
-    if (this.cdGrapple > 0) return;
-    const g = this.hero.grapple;
-    this.cdGrapple = g.cooldown * this.mods.cooldownMult;
-    switch (g.type) {
-      case 'throw':
-        game.audio.throwSfx();
-        game.spawnProjectile(this.x, this.y, this.angle, g.range, g.stun);
-        break;
-      case 'zip':
-        game.audio.gadget();
-        this.zipping = { dx: Math.cos(this.angle), dy: Math.sin(this.angle), remaining: g.range, speed: g.speed };
-        break;
-    }
+  _throw(game) {
+    if (this.cdProjectile > 0) return;
+    this.cdProjectile = this.projectileMax;
+    game.fireProjectile(this, this.angle);
   }
 }
 
 
+/* ===== src/sprites.js ===== */
+// Procedural pixel-art characters. Each character is composed on a small pixel
+// grid (via stamped shapes + auto outline), rendered once to an offscreen
+// canvas per (type, frame), then blitted with image smoothing disabled so it
+// stays crisp and chunky. Front-facing "billboard" sprites; the world code
+// flips them horizontally by facing and adds a ground facing indicator.
+
+const GW = 18, GH = 22;      // grid cells
+const PX = 4;                // offscreen pixels per grid cell
+
+// A tiny grid you can stamp shapes into, then auto-outline + render.
+class Grid {
+  constructor() { this.d = new Array(GW * GH).fill(null); }
+  set(x, y, c) { if (x >= 0 && y >= 0 && x < GW && y < GH && c) this.d[y * GW + x] = c; }
+  get(x, y) { return (x < 0 || y < 0 || x >= GW || y >= GH) ? null : this.d[y * GW + x]; }
+  rect(x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.set(x + i, y + j, c); }
+  // Mirror the left half onto the right for symmetry (center line between 8 and 9).
+  mirror() {
+    for (let y = 0; y < GH; y++)
+      for (let x = 0; x < GW / 2; x++) {
+        const c = this.get(x, y);
+        if (c) this.set(GW - 1 - x, y, c);
+      }
+  }
+  // Add a dark outline around the silhouette for readability.
+  outline(col) {
+    const add = [];
+    for (let y = 0; y < GH; y++)
+      for (let x = 0; x < GW; x++) {
+        if (this.get(x, y)) continue;
+        if (this.get(x - 1, y) || this.get(x + 1, y) || this.get(x, y - 1) || this.get(x, y + 1))
+          add.push([x, y]);
+      }
+    for (const [x, y] of add) this.set(x, y, col);
+  }
+}
+
+// Build a character grid from a palette + feature flags.
+// feature: 'horns' | 'ears' | 'mask' | 'beanie'
+function build(pal, feature, frame) {
+  const g = new Grid();
+  const { suit, dark, lite, skin, accent, eye } = pal;
+
+  // --- Head / mask ---
+  g.rect(5, 3, 4, 6, suit);       // head block (left half; mirrored later)
+  g.rect(5, 3, 4, 1, lite);       // top highlight
+  g.rect(5, 8, 4, 2, feature === 'mask' ? suit : skin); // jaw (skin unless full mask)
+
+  // Eyes
+  if (feature === 'mask') {
+    // Spider: big white eyes with a dark rim.
+    g.rect(5, 6, 3, 2, '#ffffff');
+    g.set(7, 6, dark);
+  } else {
+    g.set(6, 6, eye);             // eye
+    g.set(5, 6, dark);            // eye shadow
+  }
+  // Mouth / chin shading
+  g.set(7, 9, dark);
+
+  // --- Feature on top of head ---
+  if (feature === 'horns') {
+    g.set(5, 2, suit); g.set(5, 1, lite); g.set(5, 0, lite);
+    g.set(6, 2, suit);
+  } else if (feature === 'ears') {
+    g.set(5, 2, suit); g.set(5, 1, suit); g.set(4, 1, dark);
+  } else if (feature === 'beanie') {
+    g.rect(5, 2, 4, 2, dark);     // cap
+    g.rect(5, 5, 4, 2, dark);     // mask band over eyes
+    g.set(6, 6, eye);             // glowing eye through mask
+  } else if (feature === 'mask') {
+    // web lines
+    g.set(6, 4, dark); g.set(6, 8, dark);
+  }
+
+  // --- Torso ---
+  g.rect(4, 10, 5, 6, suit);      // chest (left half)
+  g.rect(4, 10, 5, 1, lite);      // shoulder highlight
+  g.rect(4, 14, 5, 2, dark);      // belt / lower shading
+  // Emblem stripe (accent) center chest
+  g.set(8, 11, accent); g.set(8, 12, accent); g.set(8, 13, accent);
+  g.set(7, 12, accent);
+
+  // --- Arms (animate slightly by frame) ---
+  const armY = 11 + (frame ? 0 : 0);
+  g.rect(2, armY, 2, 4, suit);    // left arm
+  g.rect(2, armY + 4, 2, 1, dark);// glove
+  g.set(3, armY - 1, lite);
+
+  // --- Legs / boots (two walk frames) ---
+  if (frame === 1) {
+    g.rect(5, 16, 2, 4, dark);    // left leg forward
+    g.rect(7, 16, 2, 3, suit);
+    g.rect(5, 20, 2, 1, '#101018');
+  } else {
+    g.rect(5, 16, 2, 4, suit);
+    g.rect(7, 16, 2, 4, dark);
+    g.rect(5, 20, 2, 1, '#101018');
+  }
+
+  g.mirror();
+  g.outline('#0b0d14');
+  return g;
+}
+
+function renderGrid(g) {
+  const cv = document.createElement('canvas');
+  cv.width = GW * PX; cv.height = GH * PX;
+  const ctx = cv.getContext('2d');
+  for (let y = 0; y < GH; y++)
+    for (let x = 0; x < GW; x++) {
+      const c = g.get(x, y);
+      if (!c) continue;
+      ctx.fillStyle = c;
+      ctx.fillRect(x * PX, y * PX, PX, PX);
+    }
+  return cv;
+}
+
+const cache = new Map();
+
+// palette + feature per character kind.
+const CHAR_STYLE = {
+  daredevil: { feature: 'horns', pal: { suit: '#d02a2a', dark: '#7c1414', lite: '#f2564e', skin: '#e0a074', accent: '#2a0808', eye: '#3a0a0a' } },
+  bat:       { feature: 'ears',  pal: { suit: '#2b3350', dark: '#151a2e', lite: '#4a557f', skin: '#d9a578', accent: '#f2d24a', eye: '#dfe6ff' } },
+  spider:    { feature: 'mask',  pal: { suit: '#b02fd0', dark: '#5f1476', lite: '#e070ff', skin: '#b02fd0', accent: '#12040f', eye: '#ffffff' } },
+  enemy:     { feature: 'beanie',pal: { suit: '#4a4f5e', dark: '#282c38', lite: '#69708a', skin: '#c99a72', accent: '#ff5a2a', eye: '#ff5a3a' } },
+  enemyHot:  { feature: 'beanie',pal: { suit: '#7a4038', dark: '#3a1c18', lite: '#b8564a', skin: '#c99a72', accent: '#ffd24a', eye: '#ffe14a' } },
+};
+
+// Return a cached sprite canvas for (kind, frame).
+function getSprite(kind, frame) {
+  const key = kind + frame;
+  if (cache.has(key)) return cache.get(key);
+  const style = CHAR_STYLE[kind] || CHAR_STYLE.enemy;
+  const cv = renderGrid(build(style.pal, style.feature, frame));
+  cache.set(key, cv);
+  return cv;
+}
+
+const SPRITE_W = GW * PX;
+const SPRITE_H = GH * PX;
+
+
 /* ===== src/render.js ===== */
-// All canvas drawing: rainy-city atmosphere, map, entities, vision cones and
-// gadget effects. Uses a camera that follows the player with slight smoothing.
+// All canvas drawing: rainy-compound atmosphere, detailed map + props, pixel-art
+// characters, vision cones, signature projectiles and gadget effects.
 
 
 
+
+
+const SPRITE_SCALE = 0.5; // on-screen sprite height ~ SPRITE_H * scale
 
 const ZONE_FLOOR = {
-  street: '#242b3d',
-  interior: '#2d2740',
-  roof: '#1f2a38',
-  crate: '#242b3d',
+  street: '#232a3b',
+  interior: '#332b42',
+  roof: '#213041',
 };
 
 class Renderer {
@@ -1681,6 +1788,7 @@ class Renderer {
     this.ctx = canvas.getContext('2d');
     this.cam = { x: 0, y: 0 };
     this.rain = [];
+    this.splashes = [];
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this._initRain();
   }
@@ -1698,24 +1806,16 @@ class Renderer {
 
   _initRain() {
     this.rain = [];
-    for (let i = 0; i < 220; i++) {
-      this.rain.push({
-        x: Math.random(), y: Math.random(),
-        len: 8 + Math.random() * 14,
-        spd: 0.5 + Math.random() * 0.9,
-      });
-    }
+    for (let i = 0; i < 240; i++)
+      this.rain.push({ x: Math.random(), y: Math.random(), len: 8 + Math.random() * 14, spd: 0.5 + Math.random() * 0.9 });
   }
 
   updateCamera(game, dt) {
     const p = game.player;
-    // Center on player but keep map roughly in view; gentle smoothing.
-    const tx = p.x - this.vw / 2;
-    const ty = p.y - this.vh / 2;
+    const tx = p.x - this.vw / 2, ty = p.y - this.vh / 2;
     this.cam.x += (tx - this.cam.x) * Math.min(1, dt * 6);
     this.cam.y += (ty - this.cam.y) * Math.min(1, dt * 6);
-    // Clamp to map bounds with a margin.
-    const margin = 80;
+    const margin = 100;
     const maxX = game.map.worldWidth() - this.vw + margin;
     const maxY = game.map.worldHeight() - this.vh + margin;
     this.cam.x = clamp(this.cam.x, -margin, Math.max(-margin, maxX));
@@ -1725,21 +1825,24 @@ class Renderer {
   render(game, time) {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    // Night sky base.
-    ctx.fillStyle = '#080a12';
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#06080f';
     ctx.fillRect(0, 0, this.vw, this.vh);
 
     ctx.save();
     ctx.translate(-Math.round(this.cam.x), -Math.round(this.cam.y));
 
-    this._drawMap(game, time);
+    this._drawFloorsAndDecos(game);
+    this._drawWalls(game);
+    this._drawProps(game, time);
     this._drawLights(game, time);
     this._drawExtract(game, time);
     this._drawWebTraps(game, time);
     this._drawSmoke(game, time);
     this._drawVisionCones(game);
+    this._drawGrapple(game);
     this._drawEnemies(game, time);
-    this._drawProjectiles(game);
+    this._drawProjectiles(game, time);
     this._drawZipTrails(game);
     this._drawPlayer(game, time);
     this._drawRadar(game);
@@ -1758,49 +1861,146 @@ class Renderer {
            y + pad > this.cam.y && y - pad < this.cam.y + this.vh;
   }
 
-  _drawMap(game, time) {
-    const ctx = this.ctx;
-    const map = game.map;
-    const c0 = Math.max(0, Math.floor(this.cam.x / TILE));
-    const r0 = Math.max(0, Math.floor(this.cam.y / TILE));
-    const c1 = Math.min(map.cols, Math.ceil((this.cam.x + this.vw) / TILE) + 1);
-    const r1 = Math.min(map.rows, Math.ceil((this.cam.y + this.vh) / TILE) + 1);
+  _bounds(map) {
+    return {
+      c0: Math.max(0, Math.floor(this.cam.x / TILE)),
+      r0: Math.max(0, Math.floor(this.cam.y / TILE)),
+      c1: Math.min(map.cols, Math.ceil((this.cam.x + this.vw) / TILE) + 1),
+      r1: Math.min(map.rows, Math.ceil((this.cam.y + this.vh) / TILE) + 1),
+    };
+  }
 
-    // Floors first.
-    for (let gy = r0; gy < r1; gy++) {
+  _drawFloorsAndDecos(game) {
+    const ctx = this.ctx, map = game.map;
+    const { c0, r0, c1, r1 } = this._bounds(map);
+    for (let gy = r0; gy < r1; gy++)
       for (let gx = c0; gx < c1; gx++) {
         const cell = map.cells[map.idx(gx, gy)];
-        if (cell !== FLOOR) continue;
-        const x = gx * TILE, y = gy * TILE;
         const zone = map.zones[map.idx(gx, gy)];
-        ctx.fillStyle = ZONE_FLOOR[zone] || ZONE_FLOOR.street;
+        const isProp = cell === WALL && zone.startsWith('prop_');
+        if (cell !== FLOOR && !isProp) continue;
+        const x = gx * TILE, y = gy * TILE;
+        const baseZone = isProp ? 'interior' : zone;
+        ctx.fillStyle = ZONE_FLOOR[baseZone] || ZONE_FLOOR.street;
         ctx.fillRect(x, y, TILE, TILE);
-        // Wet sheen grid lines.
-        ctx.strokeStyle = 'rgba(120,150,200,0.06)';
+        // Subtle checker + grout for texture.
+        if ((gx + gy) & 1) { ctx.fillStyle = 'rgba(255,255,255,0.018)'; ctx.fillRect(x, y, TILE, TILE); }
+        ctx.strokeStyle = 'rgba(130,160,210,0.05)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
       }
-    }
 
-    // Walls with a fake-height top edge for a 2.5D read.
-    for (let gy = r0; gy < r1; gy++) {
-      for (let gx = c0; gx < c1; gx++) {
-        const cell = map.cells[map.idx(gx, gy)];
-        if (cell !== WALL) continue;
-        const x = gx * TILE, y = gy * TILE;
-        const zone = map.zones[map.idx(gx, gy)];
-        const isCrate = zone === 'crate';
-        // Body / shadow.
-        ctx.fillStyle = isCrate ? '#3a2f22' : '#11141f';
-        ctx.fillRect(x, y, TILE, TILE);
-        // Top face highlight.
-        ctx.fillStyle = isCrate ? '#5a4630' : '#1b2030';
-        ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 8);
-        // Rim light.
-        ctx.fillStyle = isCrate ? 'rgba(255,200,120,0.15)' : 'rgba(120,160,220,0.10)';
-        ctx.fillRect(x + 2, y + 2, TILE - 4, 3);
+    // Decorations.
+    for (const d of map.decos) {
+      const x = d.gx * TILE, y = d.gy * TILE;
+      if (!this._visible(x + TILE / 2, y + TILE / 2)) continue;
+      if (d.type === 'rug') {
+        ctx.fillStyle = 'rgba(150,70,90,0.16)';
+        ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
+        ctx.strokeStyle = 'rgba(220,160,120,0.14)';
+        ctx.strokeRect(x + 6, y + 6, TILE - 12, TILE - 12);
+      } else if (d.type === 'puddle') {
+        ctx.fillStyle = 'rgba(120,170,220,0.10)';
+        ctx.beginPath(); ctx.ellipse(x + TILE / 2, y + TILE / 2, TILE * 0.32, TILE * 0.2, 0, 0, TAU); ctx.fill();
+      } else if (d.type === 'grate') {
+        ctx.strokeStyle = 'rgba(20,26,40,0.6)'; ctx.lineWidth = 2;
+        for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x + 10, y + i * TILE / 4); ctx.lineTo(x + TILE - 10, y + i * TILE / 4); ctx.stroke(); }
+      } else if (d.type === 'crack') {
+        ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x + 12, y + 14); ctx.lineTo(x + 26, y + 30); ctx.lineTo(x + 40, y + 22); ctx.stroke();
       }
     }
+  }
+
+  _drawWalls(game) {
+    const ctx = this.ctx, map = game.map;
+    const { c0, r0, c1, r1 } = this._bounds(map);
+    for (let gy = r0; gy < r1; gy++)
+      for (let gx = c0; gx < c1; gx++) {
+        if (map.cells[map.idx(gx, gy)] !== WALL) continue;
+        if (map.zones[map.idx(gx, gy)].startsWith('prop_')) continue; // drawn as prop
+        const x = gx * TILE, y = gy * TILE;
+        const openBelow = map.cellAt(gx, gy + 1) === FLOOR;
+        // Body.
+        ctx.fillStyle = '#0e111b';
+        ctx.fillRect(x, y, TILE, TILE);
+        // Top face.
+        ctx.fillStyle = '#1b2233';
+        ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 6);
+        // Rim light on top.
+        ctx.fillStyle = 'rgba(120,160,220,0.12)';
+        ctx.fillRect(x + 2, y + 2, TILE - 4, 3);
+        // Cast a soft face/shadow where a wall meets open floor below.
+        if (openBelow) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, y + TILE - 2, TILE, 8); }
+      }
+  }
+
+  _drawProps(game, time) {
+    const ctx = this.ctx;
+    for (const pr of game.map.props) {
+      const cx = (pr.gx + 0.5) * TILE, cy = (pr.gy + 0.5) * TILE;
+      if (!this._visible(cx, cy)) continue;
+      // Shadow.
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath(); ctx.ellipse(cx, cy + 14, 18, 8, 0, 0, TAU); ctx.fill();
+      switch (pr.type) {
+        case 'crate': this._crate(ctx, cx, cy); break;
+        case 'barrel': this._barrel(ctx, cx, cy); break;
+        case 'desk': this._desk(ctx, cx, cy); break;
+        case 'locker': this._locker(ctx, cx, cy); break;
+        case 'lamp': this._lamp(ctx, cx, cy, time); break;
+        case 'plant': this._plant(ctx, cx, cy); break;
+        case 'pole': this._pole(ctx, cx, cy); break;
+      }
+    }
+  }
+
+  _crate(ctx, x, y) {
+    const s = 20;
+    ctx.fillStyle = '#5a4123'; ctx.fillRect(x - s, y - s + 6, s * 2, s * 2 - 4);
+    ctx.fillStyle = '#6e5230'; ctx.fillRect(x - s + 2, y - s + 8, s * 2 - 4, s * 2 - 10);
+    ctx.strokeStyle = '#3a2a16'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - s + 2, y - s + 8); ctx.lineTo(x + s - 2, y + s - 4); ctx.moveTo(x + s - 2, y - s + 8); ctx.lineTo(x - s + 2, y + s - 4); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,220,150,0.12)'; ctx.fillRect(x - s + 2, y - s + 8, s * 2 - 4, 3);
+  }
+  _barrel(ctx, x, y) {
+    ctx.fillStyle = '#3a4b5a'; ctx.fillRect(x - 14, y - 16, 28, 34);
+    ctx.fillStyle = '#4c6274'; ctx.fillRect(x - 12, y - 16, 24, 34);
+    ctx.strokeStyle = '#2a3540'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - 12, y - 4); ctx.lineTo(x + 12, y - 4); ctx.moveTo(x - 12, y + 8); ctx.lineTo(x + 12, y + 8); ctx.stroke();
+    ctx.fillStyle = '#63809a'; ctx.beginPath(); ctx.ellipse(x, y - 16, 12, 5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.ellipse(x - 3, y - 17, 6, 2.5, 0, 0, TAU); ctx.fill();
+  }
+  _desk(ctx, x, y) {
+    ctx.fillStyle = '#2b2436'; ctx.fillRect(x - 22, y - 12, 44, 26);
+    ctx.fillStyle = '#3a3350'; ctx.fillRect(x - 22, y - 14, 44, 6);
+    // Monitor glow.
+    ctx.fillStyle = '#1a2a44'; ctx.fillRect(x - 8, y - 10, 16, 10);
+    ctx.fillStyle = 'rgba(110,180,255,0.5)'; ctx.fillRect(x - 6, y - 8, 12, 6);
+  }
+  _locker(ctx, x, y) {
+    ctx.fillStyle = '#39414f'; ctx.fillRect(x - 16, y - 22, 32, 40);
+    ctx.fillStyle = '#4a5566'; ctx.fillRect(x - 14, y - 22, 30, 40);
+    ctx.strokeStyle = '#2a323d'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y - 22); ctx.lineTo(x, y + 18); ctx.stroke();
+    ctx.fillStyle = '#22282f'; ctx.fillRect(x - 5, y - 4, 3, 6); ctx.fillRect(x + 2, y - 4, 3, 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(x - 14, y - 22, 30, 3);
+  }
+  _lamp(ctx, x, y, time) {
+    ctx.fillStyle = '#2a3040'; ctx.fillRect(x - 3, y - 4, 6, 18);
+    const fl = 0.8 + Math.sin(time * 9 + x) * 0.15;
+    ctx.fillStyle = `rgba(150,200,255,${fl})`;
+    ctx.beginPath(); ctx.arc(x, y - 8, 6, 0, TAU); ctx.fill();
+  }
+  _plant(ctx, x, y) {
+    ctx.fillStyle = '#3a2a1e'; ctx.fillRect(x - 8, y + 2, 16, 12);
+    ctx.fillStyle = '#2f6b3a';
+    ctx.beginPath(); ctx.arc(x - 5, y - 2, 8, 0, TAU); ctx.arc(x + 6, y - 4, 7, 0, TAU); ctx.arc(x, y - 10, 9, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(120,220,140,0.25)'; ctx.beginPath(); ctx.arc(x - 2, y - 10, 4, 0, TAU); ctx.fill();
+  }
+  _pole(ctx, x, y) {
+    ctx.fillStyle = '#20252f'; ctx.fillRect(x - 3, y - 20, 6, 38);
+    ctx.fillStyle = '#2c333f'; ctx.fillRect(x - 12, y - 20, 24, 4);
   }
 
   _drawLights(game, time) {
@@ -1811,13 +2011,11 @@ class Renderer {
       if (!this._visible(L.x, L.y, L.r)) continue;
       const flick = 0.85 + Math.sin(time * 9 + L.x) * 0.05;
       const g = ctx.createRadialGradient(L.x, L.y, 4, L.x, L.y, L.r);
-      g.addColorStop(0, `rgba(120,190,255,${0.35 * flick})`);
-      g.addColorStop(0.4, `rgba(90,140,220,${0.14 * flick})`);
+      g.addColorStop(0, `rgba(120,190,255,${0.32 * flick})`);
+      g.addColorStop(0.4, `rgba(90,140,220,${0.12 * flick})`);
       g.addColorStop(1, 'rgba(60,90,160,0)');
       ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(L.x, L.y, L.r, 0, TAU);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(L.x, L.y, L.r, 0, TAU); ctx.fill();
     }
     ctx.restore();
   }
@@ -1825,27 +2023,21 @@ class Renderer {
   _drawExtract(game, time) {
     if (!game.map.extract) return;
     const ctx = this.ctx;
-    const ex = (game.map.extract.gx + 0.5) * TILE;
-    const ey = (game.map.extract.gy + 0.5) * TILE;
+    const ex = (game.map.extract.gx + 0.5) * TILE, ey = (game.map.extract.gy + 0.5) * TILE;
     const active = game.enemiesRemaining() === 0;
     const pulse = 0.5 + Math.sin(time * 4) * 0.5;
     ctx.save();
     ctx.translate(ex, ey);
-    const col = active ? `rgba(80,255,160,` : `rgba(120,150,180,`;
+    const col = active ? 'rgba(80,255,160,' : 'rgba(120,150,180,';
     for (let i = 0; i < 3; i++) {
       const r = 12 + i * 10 + (active ? pulse * 8 : 0);
       ctx.strokeStyle = col + (active ? 0.6 - i * 0.15 : 0.25 - i * 0.06) + ')';
       ctx.lineWidth = active ? 3 : 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, TAU);
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
     }
-    // Chevrons pointing in.
     ctx.fillStyle = active ? `rgba(120,255,190,${0.6 + pulse * 0.3})` : 'rgba(150,170,190,0.4)';
-    ctx.font = 'bold 12px system-ui';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(active ? 'EXTRACT' : 'LOCKED', 0, active ? -30 : -28);
+    ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(active ? 'EXTRACT' : 'LOCKED', 0, -30);
     ctx.restore();
   }
 
@@ -1856,215 +2048,187 @@ class Renderer {
       if (!this._visible(e.x, e.y, e.visionRange)) continue;
       let color;
       switch (e.state) {
-        case STATE.COMBAT:
-        case STATE.ALERTED: color = 'rgba(255,60,60,'; break;
+        case STATE.COMBAT: case STATE.ALERTED: color = 'rgba(255,60,60,'; break;
         case STATE.SUSPICIOUS: color = 'rgba(255,170,40,'; break;
         case STATE.SEARCHING: color = 'rgba(255,120,40,'; break;
         default: color = 'rgba(255,240,120,';
       }
       const half = e.state === STATE.COMBAT ? e.visionHalf + 0.3 : e.visionHalf;
       const steps = 16;
-      ctx.beginPath();
-      ctx.moveTo(e.x, e.y);
+      ctx.beginPath(); ctx.moveTo(e.x, e.y);
       for (let i = 0; i <= steps; i++) {
         const a = e.angle - half + (2 * half) * (i / steps);
-        // Ray-cast the cone edge so it stops at walls.
         const r = this._rayLen(game, e.x, e.y, a, e.visionRange);
         ctx.lineTo(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r);
       }
       ctx.closePath();
       const g = ctx.createRadialGradient(e.x, e.y, 4, e.x, e.y, e.visionRange);
-      g.addColorStop(0, color + '0.22)');
-      g.addColorStop(1, color + '0)');
-      ctx.fillStyle = g;
-      ctx.fill();
+      g.addColorStop(0, color + '0.22)'); g.addColorStop(1, color + '0)');
+      ctx.fillStyle = g; ctx.fill();
     }
   }
 
   _rayLen(game, x, y, a, maxR) {
-    const step = TILE * 0.35;
-    const dx = Math.cos(a), dy = Math.sin(a);
+    const step = TILE * 0.35, dx = Math.cos(a), dy = Math.sin(a);
     let r = step;
-    while (r < maxR) {
-      if (game.map.isBlockedWorld(x + dx * r, y + dy * r)) return r;
-      r += step;
-    }
+    while (r < maxR) { if (game.map.isBlockedWorld(x + dx * r, y + dy * r)) return r; r += step; }
     return maxR;
+  }
+
+  // --- Pixel sprite billboard ---
+  _drawSprite(kind, x, y, angle, frame, bob) {
+    const ctx = this.ctx;
+    const cv = getSprite(kind, frame);
+    const w = SPRITE_W * SPRITE_SCALE, h = SPRITE_H * SPRITE_SCALE;
+    const facingLeft = Math.cos(angle) < 0;
+    ctx.save();
+    ctx.translate(Math.round(x), Math.round(y - h * 0.7 + (bob || 0)));
+    if (facingLeft) ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cv, Math.round(-w / 2), 0, Math.round(w), Math.round(h));
+    ctx.restore();
+  }
+
+  _shadow(x, y, rx = 14) {
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(x, y + 12, rx, rx * 0.5, 0, 0, TAU); ctx.fill();
   }
 
   _drawEnemies(game, time) {
     const ctx = this.ctx;
     for (const e of game.enemies) {
-      if (!this._visible(e.x, e.y)) continue;
+      if (!this._visible(e.x, e.y, 40)) continue;
       if (e.downed) { this._drawDowned(ctx, e); continue; }
-      // Shadow.
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 10, 14, 7, 0, 0, TAU);
-      ctx.fill();
-
-      // Hostile enemies read as bright orange-red; passive ones as muted rust —
-      // both clearly distinct from any playable hero color.
+      this._shadow(e.x, e.y);
       const hostile = e.state === STATE.COMBAT || e.state === STATE.ALERTED;
-      const bodyCol = e.hitFlash > 0 ? '#ffffff'
-        : e.stun > 0 ? '#6f7280'
-        : hostile ? '#ff6a2a' : '#8f4a3c';
-      const headCol = e.stun > 0 ? '#4a4d58' : hostile ? '#b83b12' : '#4d221b';
-      this._drawHumanoid(ctx, e.x, e.y, e.angle, bodyCol, headCol, 13, 'rgba(0,0,0,0.55)');
+      const moving = e.state !== STATE.IDLE && e.rooted <= 0 && e.stun <= 0;
+      const frame = moving ? Math.floor(time * 6 + e.x * 0.05) % 2 : 0;
+      const bob = moving ? Math.abs(Math.sin(time * 8 + e.x)) * -2 : 0;
+      ctx.save();
+      if (e.stun > 0) ctx.globalAlpha = 0.7;
+      this._drawSprite(hostile ? 'enemyHot' : 'enemy', e.x, e.y, e.angle, frame, bob);
+      ctx.restore();
 
-      // State glyph above head.
+      // State glyph.
       const glyph = e.stun > 0 ? '★' : e.rooted > 0 ? '🕸'
         : e.state === STATE.SUSPICIOUS ? '?'
         : (e.state === STATE.ALERTED || e.state === STATE.COMBAT) ? '!'
         : e.state === STATE.SEARCHING ? '?' : '';
       if (glyph) {
-        ctx.fillStyle = e.state === STATE.SUSPICIOUS ? '#ffce4a'
+        ctx.fillStyle = e.state === STATE.SUSPICIOUS || e.state === STATE.SEARCHING ? '#ffce4a'
           : (e.state === STATE.ALERTED || e.state === STATE.COMBAT) ? '#ff4a4a' : '#ffce4a';
-        ctx.font = 'bold 16px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(glyph, e.x, e.y - 24 + Math.sin(time * 6) * 1.5);
+        ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText(glyph, e.x, e.y - 34 + Math.sin(time * 6) * 1.5);
       }
     }
   }
 
   _drawDowned(ctx, e) {
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 16, 8, 0, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(150,60,60,0.7)';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, TAU);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(200,90,90,0.8)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(-6, -6); ctx.lineTo(6, 6);
-    ctx.moveTo(6, -6); ctx.lineTo(-6, 6);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  _drawHumanoid(ctx, x, y, angle, bodyCol, headCol, size, outline = null) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle + Math.PI / 2); // sprite faces "up" at angle 0 -> rotate
-    // Torso (capsule).
-    if (outline) {
-      ctx.strokeStyle = outline;
-      ctx.lineWidth = 2.5;
-      this._roundRect(ctx, -size * 0.6, -size * 0.4, size * 1.2, size * 1.5, 6);
-      ctx.stroke();
-    }
-    ctx.fillStyle = bodyCol;
-    this._roundRect(ctx, -size * 0.6, -size * 0.4, size * 1.2, size * 1.5, 6);
-    ctx.fill();
-    // Shoulders hint.
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    this._roundRect(ctx, -size * 0.6, -size * 0.4, size * 1.2, 5, 3);
-    ctx.fill();
-    // Head.
-    ctx.fillStyle = headCol;
-    ctx.beginPath();
-    ctx.arc(0, -size * 0.55, size * 0.5, 0, TAU);
-    ctx.fill();
-    // Facing nub (nose direction).
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath();
-    ctx.arc(0, -size * 0.9, size * 0.16, 0, TAU);
-    ctx.fill();
+    ctx.save(); ctx.translate(e.x, e.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 4, 16, 8, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,60,60,0.7)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = 'rgba(200,90,90,0.8)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(6, 6); ctx.moveTo(6, -6); ctx.lineTo(-6, 6); ctx.stroke();
     ctx.restore();
   }
 
   _drawPlayer(game, time) {
     const ctx = this.ctx;
     const p = game.player;
-    // Shadow.
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 11, 15, 7, 0, 0, TAU);
-    ctx.fill();
+    this._shadow(p.x, p.y, 15);
 
-    // Lunge offset during takedown.
-    let ox = 0, oy = 0;
-    if (p.takedownAnim > 0) {
-      const k = Math.sin((1 - p.takedownAnim / 0.22) * Math.PI) * 10;
-      ox = Math.cos(p.angle) * k; oy = Math.sin(p.angle) * k;
-    }
-
-    // Glow halo in hero accent (additive).
+    // Facing wedge on the ground.
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 36);
-    g.addColorStop(0, this._hexA(p.hero.accent, p.hidden ? 0.1 : 0.28));
-    g.addColorStop(1, this._hexA(p.hero.accent, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 36, 0, TAU); ctx.fill();
+    ctx.translate(p.x, p.y + 10);
+    ctx.rotate(p.angle);
+    ctx.fillStyle = this._hexA(p.hero.accent, 0.28);
+    ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(26, -9); ctx.lineTo(26, 9); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    // Persistent ground ring so the player is always instantly locatable.
+    // Persistent ground ring so the hero is always locatable.
     ctx.strokeStyle = this._hexA(p.hero.accent, p.hidden ? 0.35 : 0.9);
     ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 11, 17, 8, 0, 0, TAU);
-    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 11, 17, 8, 0, 0, TAU); ctx.stroke();
 
-    // Bright white outline keeps the hero readable over any floor/enemy.
-    this._drawHumanoid(ctx, p.x + ox, p.y + oy, p.angle, p.hero.color, p.hero.accent, 15, 'rgba(255,255,255,0.85)');
+    // Accent glow.
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 34);
+    g.addColorStop(0, this._hexA(p.hero.accent, p.hidden ? 0.08 : 0.2));
+    g.addColorStop(1, this._hexA(p.hero.accent, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 34, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    let ox = 0, oy = 0;
+    if (p.takedownAnim > 0) { const k = Math.sin((1 - p.takedownAnim / 0.22) * Math.PI) * 10; ox = Math.cos(p.angle) * k; oy = Math.sin(p.angle) * k; }
+    const bob = (p.moving && !p.dashing) ? Math.abs(Math.sin(time * 9)) * -2 : 0;
+    ctx.save();
+    if (p.hidden) ctx.globalAlpha = 0.55;
+    this._drawSprite(p.hero.spriteKind, p.x + ox, p.y + oy, p.angle, p.frame, bob);
+    ctx.restore();
 
     if (p.hidden) {
-      ctx.fillStyle = 'rgba(200,220,255,0.5)';
-      ctx.font = '11px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('hidden', p.x, p.y - 26);
+      ctx.fillStyle = 'rgba(200,220,255,0.5)'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('hidden', p.x, p.y - 40);
     }
+  }
+
+  _drawGrapple(game) {
+    const p = game.player;
+    if (!p.rope) return;
+    const ctx = this.ctx;
+    ctx.strokeStyle = `rgba(210,210,220,${clamp(p.rope.t / 0.35, 0, 1) * 0.8})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y - 6); ctx.lineTo(p.rope.ax, p.rope.ay); ctx.stroke();
+    ctx.fillStyle = '#c9ccd6'; ctx.beginPath(); ctx.arc(p.rope.ax, p.rope.ay, 4, 0, TAU); ctx.fill();
   }
 
   _drawRadar(game) {
-    // Warden radar sense: outline all enemies through walls.
     if (game.player.radarTimer <= 0) return;
     const ctx = this.ctx;
     const a = clamp(game.player.radarTimer / 1, 0, 1);
-    ctx.save();
     for (const e of game.enemies) {
       if (e.downed) continue;
-      ctx.strokeStyle = `rgba(255,80,80,${0.5 * a})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, 20, 0, TAU);
-      ctx.stroke();
-      // Direction tick.
-      ctx.beginPath();
-      ctx.moveTo(e.x, e.y);
-      ctx.lineTo(e.x + Math.cos(e.angle) * 22, e.y + Math.sin(e.angle) * 22);
-      ctx.stroke();
+      ctx.strokeStyle = `rgba(255,80,80,${0.5 * a})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, 22, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.angle) * 24, e.y + Math.sin(e.angle) * 24); ctx.stroke();
     }
-    ctx.restore();
   }
 
-  _drawProjectiles(game) {
+  _drawProjectiles(game, time) {
     const ctx = this.ctx;
     for (const pr of game.projectiles) {
-      ctx.strokeStyle = pr.enemy ? 'rgba(255,120,90,0.95)' : 'rgba(180,220,255,0.95)';
-      ctx.lineWidth = pr.enemy ? 3 : 4;
-      ctx.beginPath();
-      ctx.moveTo(pr.x, pr.y);
-      ctx.lineTo(pr.x - pr.vx * 0.02, pr.y - pr.vy * 0.02);
-      ctx.stroke();
+      if (pr.type === 'billyclub') {
+        ctx.save(); ctx.translate(pr.x, pr.y); ctx.rotate(pr.spin);
+        ctx.fillStyle = '#111'; ctx.fillRect(-11, -3, 22, 6);          // black grip half
+        ctx.fillStyle = '#e23b3b'; ctx.fillRect(0, -3, 11, 6);          // red half
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(-11, -3, 22, 1.5);
+        ctx.restore();
+      } else if (pr.type === 'batarang') {
+        ctx.save(); ctx.translate(pr.x, pr.y); ctx.rotate(pr.spin);
+        ctx.fillStyle = '#1a2036';
+        ctx.beginPath();
+        ctx.moveTo(-12, 0); ctx.lineTo(-3, -3); ctx.lineTo(0, -10); ctx.lineTo(3, -3);
+        ctx.lineTo(12, 0); ctx.lineTo(3, 3); ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(120,150,255,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.restore();
+      } else if (pr.type === 'web') {
+        ctx.strokeStyle = 'rgba(235,240,255,0.9)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(pr.x, pr.y); ctx.lineTo(pr.x - pr.vx * 0.03, pr.y - pr.vy * 0.03); ctx.stroke();
+        ctx.fillStyle = '#eef2ff'; ctx.beginPath(); ctx.arc(pr.x, pr.y, 3, 0, TAU); ctx.fill();
+      } else if (pr.type === 'bullet') {
+        ctx.strokeStyle = 'rgba(255,120,90,0.95)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(pr.x, pr.y); ctx.lineTo(pr.x - pr.vx * 0.02, pr.y - pr.vy * 0.02); ctx.stroke();
+      }
     }
   }
 
   _drawZipTrails(game) {
     const ctx = this.ctx;
     for (const t of game.zipTrails) {
-      ctx.strokeStyle = `rgba(230,180,255,${t.life * 0.8})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, 4, 0, TAU);
-      ctx.stroke();
+      ctx.strokeStyle = `rgba(230,180,255,${t.life * 0.8})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(t.x, t.y, 4, 0, TAU); ctx.stroke();
     }
   }
 
@@ -2072,18 +2236,14 @@ class Renderer {
     const ctx = this.ctx;
     for (const s of game.smokes) {
       const a = clamp(s.life / s.duration, 0, 1);
-      ctx.save();
-      ctx.globalAlpha = 0.75 * Math.min(1, a * 2);
+      ctx.save(); ctx.globalAlpha = 0.75 * Math.min(1, a * 2);
       for (let i = 0; i < 7; i++) {
         const ang = i / 7 * TAU + time * 0.3;
         const rr = s.radius * (0.4 + 0.5 * Math.sin(time + i));
-        const px = s.x + Math.cos(ang) * s.radius * 0.4;
-        const py = s.y + Math.sin(ang) * s.radius * 0.4;
+        const px = s.x + Math.cos(ang) * s.radius * 0.4, py = s.y + Math.sin(ang) * s.radius * 0.4;
         const g = ctx.createRadialGradient(px, py, 2, px, py, rr);
-        g.addColorStop(0, 'rgba(190,200,210,0.5)');
-        g.addColorStop(1, 'rgba(150,160,175,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(px, py, rr, 0, TAU); ctx.fill();
+        g.addColorStop(0, 'rgba(190,200,210,0.5)'); g.addColorStop(1, 'rgba(150,160,175,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, rr, 0, TAU); ctx.fill();
       }
       ctx.restore();
     }
@@ -2092,111 +2252,67 @@ class Renderer {
   _drawWebTraps(game, time) {
     const ctx = this.ctx;
     for (const w of game.webTraps) {
-      ctx.save();
-      ctx.translate(w.x, w.y);
-      ctx.strokeStyle = `rgba(230,235,255,${0.6 * clamp(w.life / w.duration, 0, 1)})`;
-      ctx.lineWidth = 1.5;
+      ctx.save(); ctx.translate(w.x, w.y);
+      ctx.strokeStyle = `rgba(230,235,255,${0.6 * clamp(w.life / w.duration, 0, 1)})`; ctx.lineWidth = 1.5;
       const R = w.radius;
-      for (let i = 0; i < 8; i++) {
-        const a = i / 8 * TAU;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); ctx.stroke();
-      }
-      for (let ring = 1; ring <= 3; ring++) {
-        ctx.beginPath(); ctx.arc(0, 0, R * ring / 3, 0, TAU); ctx.stroke();
-      }
+      for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); ctx.stroke(); }
+      for (let ring = 1; ring <= 3; ring++) { ctx.beginPath(); ctx.arc(0, 0, R * ring / 3, 0, TAU); ctx.stroke(); }
       ctx.restore();
     }
   }
 
   _drawAlerts(game, time) {
-    // Expanding rings where alarms were raised.
     const ctx = this.ctx;
     for (const a of game.alertPings) {
       const t = 1 - a.life / a.max;
-      ctx.strokeStyle = `rgba(255,70,70,${a.life / a.max})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, 10 + t * 60, 0, TAU);
-      ctx.stroke();
+      ctx.strokeStyle = `rgba(255,70,70,${a.life / a.max})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(a.x, a.y, 10 + t * 60, 0, TAU); ctx.stroke();
     }
   }
 
   _drawFloaters(game) {
     const ctx = this.ctx;
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 13px system-ui';
-    for (const f of game.floaters) {
-      ctx.globalAlpha = clamp(f.life, 0, 1);
-      ctx.fillStyle = f.color || '#fff';
-      ctx.fillText(f.text, f.x, f.y);
-    }
+    ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 13px system-ui';
+    for (const f of game.floaters) { ctx.globalAlpha = clamp(f.life, 0, 1); ctx.fillStyle = f.color || '#fff'; ctx.fillText(f.text, f.x, f.y); }
     ctx.restore();
   }
 
   _drawRain(ctx, time) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(170,190,230,0.25)';
-    ctx.lineWidth = 1;
+    ctx.save(); ctx.strokeStyle = 'rgba(170,190,230,0.22)'; ctx.lineWidth = 1;
     const w = this.vw, h = this.vh;
     for (const d of this.rain) {
-      const x = d.x * w;
-      const y = ((d.y + (time * d.spd) % 1) % 1) * h;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x - 2, y + d.len);
-      ctx.stroke();
+      const x = d.x * w, y = ((d.y + (time * d.spd) % 1) % 1) * h;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2, y + d.len); ctx.stroke();
     }
     ctx.restore();
   }
 
   _drawFog(ctx) {
-    // Vignette + faint fog to sell the night mood.
-    const g = ctx.createRadialGradient(this.vw / 2, this.vh / 2, this.vh * 0.3,
-      this.vw / 2, this.vh / 2, this.vh * 0.75);
-    g.addColorStop(0, 'rgba(10,14,24,0)');
-    g.addColorStop(1, 'rgba(6,8,16,0.72)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.vw, this.vh);
+    const g = ctx.createRadialGradient(this.vw / 2, this.vh / 2, this.vh * 0.32, this.vw / 2, this.vh / 2, this.vh * 0.78);
+    g.addColorStop(0, 'rgba(8,11,20,0)'); g.addColorStop(1, 'rgba(5,7,14,0.74)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, this.vw, this.vh);
   }
 
   _drawJoystick(ctx, input) {
     if (!input || !input.joy.active) return;
     const j = input.joy;
     ctx.save();
-    ctx.strokeStyle = 'rgba(200,220,255,0.35)';
-    ctx.fillStyle = 'rgba(120,150,220,0.12)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(200,220,255,0.35)'; ctx.fillStyle = 'rgba(120,150,220,0.12)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(j.ox, j.oy, 60, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(200,220,255,0.45)';
-    ctx.beginPath(); ctx.arc(j.cx, j.cy, 26, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(200,220,255,0.45)'; ctx.beginPath(); ctx.arc(j.cx, j.cy, 26, 0, TAU); ctx.fill();
     ctx.restore();
-  }
-
-  _roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
   }
 
   _hexA(hex, a) {
     const h = hex.replace('#', '');
-    const r = parseInt(h.substring(0, 2), 16);
-    const g = parseInt(h.substring(2, 4), 16);
-    const b = parseInt(h.substring(4, 6), 16);
-    return `rgba(${r},${g},${b},${a})`;
+    return `rgba(${parseInt(h.substring(0, 2), 16)},${parseInt(h.substring(2, 4), 16)},${parseInt(h.substring(4, 6), 16)},${a})`;
   }
 }
 
 
 /* ===== src/game.js ===== */
 // The Game orchestrates one mission: map, player, enemies, gadget effects,
-// sound events, alarm propagation, and win/lose. main.js owns screens and the
-// loop and calls update()/render() here.
+// signature projectiles, sound events, alarm propagation, and win/lose.
 
 
 
@@ -2211,25 +2327,24 @@ class Game {
     this.level = level;
     this.heroId = heroId;
 
-    this.state = 'playing'; // playing | complete | failed
+    this.state = 'playing';
     this.time = 0;
-    this.alarm = 0;         // global alarm 0..1
-    this.detections = 0;    // how many times spotted (for scoring)
+    this.alarm = 0;
+    this.detections = 0;
     this.intelEarned = 0;
 
     this.seed = (Date.now() ^ (level * 2654435761)) >>> 0;
     this.rng = makeRng(this.seed);
     this.map = new GameMap(this.seed, level);
 
-    // Transient world objects.
     this.enemies = [];
     this.projectiles = [];
-    this.sounds = [];      // active sound events (decay each frame)
+    this.sounds = [];
     this.smokes = [];
     this.webTraps = [];
     this.zipTrails = [];
     this.alertPings = [];
-    this.floaters = [];    // score/text popups (screen space) handled in main
+    this.floaters = [];
 
     this.playerHealthMax = 100;
     this.playerHealth = 100;
@@ -2239,38 +2354,45 @@ class Game {
   }
 
   _spawn() {
-    const mods = this.progression.mods();
-    // Player starts near map center-ish, away from extract.
+    const heroMods = this.progression.heroMods(this.heroId);
     const start = this.map.randomFloorPos();
-    this.player = new Player(this.heroId, start.x, start.y, mods);
+    this.player = new Player(this.heroId, start.x, start.y, heroMods);
 
-    // Enemy count scales with level.
     const count = clamp(3 + Math.floor(this.level * 1.2), 3, 12);
-    const extractPos = {
-      x: (this.map.extract.gx + 0.5) * TILE,
-      y: (this.map.extract.gy + 0.5) * TILE,
-    };
-    for (let i = 0; i < count; i++) {
-      const pos = this.map.randomFloorPos({ x: this.player.x, y: this.player.y }, TILE * 4);
-      // Build a small patrol loop from nearby floor tiles.
+    const placed = [{ x: this.player.x, y: this.player.y }];
+    const MIN_APART = TILE * 5.5;   // keep enemies well spread
+    const MIN_FROM_PLAYER = TILE * 6;
+
+    let guard = 0;
+    while (this.enemies.length < count && guard++ < 400) {
+      const pos = this.map.randomFloorPos();
+      let ok = dist(pos.x, pos.y, this.player.x, this.player.y) >= MIN_FROM_PLAYER;
+      for (const p of placed) if (dist(pos.x, pos.y, p.x, p.y) < MIN_APART) { ok = false; break; }
+      if (!ok) continue;
+      placed.push({ x: pos.x, y: pos.y });
+
+      // Patrol loop from nearby floor tiles.
       const wps = [{ x: pos.x, y: pos.y }];
       const n = randInt(this.rng, 2, 3);
       for (let k = 0; k < n; k++) {
-        const wp = this.map.randomFloorPos(pos, TILE * 2);
+        const wp = this.map.randomFloorPos(pos, TILE * 2.5);
         wps.push({ x: wp.x, y: wp.y });
       }
-      const e = new Enemy(pos.x, pos.y, wps, {
+      this.enemies.push(new Enemy(pos.x, pos.y, wps, {
         visionRange: TILE * (3.8 + Math.min(this.level * 0.12, 1.6)),
         visionHalf: 0.6,
         speed: 70 + Math.min(this.level * 2, 30),
-      });
-      this.enemies.push(e);
+      }));
+    }
+    // If spacing was too strict for a tiny map, relax and top up.
+    guard = 0;
+    while (this.enemies.length < 3 && guard++ < 100) {
+      const pos = this.map.randomFloorPos({ x: this.player.x, y: this.player.y }, TILE * 4);
+      this.enemies.push(new Enemy(pos.x, pos.y, [{ x: pos.x, y: pos.y }], { visionRange: TILE * 4, visionHalf: 0.6, speed: 74 }));
     }
   }
 
-  enemiesRemaining() {
-    return this.enemies.filter((e) => !e.downed).length;
-  }
+  enemiesRemaining() { return this.enemies.filter((e) => !e.downed).length; }
 
   update(dt) {
     if (this.state !== 'playing') return;
@@ -2278,7 +2400,6 @@ class Game {
     this.input.pollKeyboard();
 
     this.player.update(dt, this.input, this);
-
     for (const e of this.enemies) e.update(dt, this);
 
     this._updateProjectiles(dt);
@@ -2286,89 +2407,180 @@ class Game {
     this._checkWebTraps();
     this._decaySounds(dt);
     this._updateAlarm(dt);
-
     if (this.playerHitFlash > 0) this.playerHitFlash -= dt;
 
-    // Exposure meter for HUD: highest suspicion among enemies that can see us.
     let exposure = 0;
-    for (const e of this.enemies) if (!e.downed) exposure = Math.max(exposure, e.canSeePlayer ? e.suspicion : 0);
+    for (const e of this.enemies) if (!e.downed && e.canSeePlayer) exposure = Math.max(exposure, e.suspicion);
     this.player.detectionMeter = exposure;
 
-    // Win: all enemies down AND player on extract pad.
     if (this.enemiesRemaining() === 0) {
-      const ex = (this.map.extract.gx + 0.5) * TILE;
-      const ey = (this.map.extract.gy + 0.5) * TILE;
-      if (dist(this.player.x, this.player.y, ex, ey) < TILE * 0.7) this._win();
+      const ex = (this.map.extract.gx + 0.5) * TILE, ey = (this.map.extract.gy + 0.5) * TILE;
+      if (dist(this.player.x, this.player.y, ex, ey) < TILE * 0.8) this._win();
     }
-
-    // Lose: health depleted.
     if (this.playerHealth <= 0) this._lose();
 
     this.input.clearActions();
   }
 
-  // --- Combat / interactions ---
-
+  // --- Takedowns ---
   doTakedown(enemy, player, fromBehind) {
     if (enemy.downed) return;
     enemy.takeDown();
     this.audio.takedown();
     this.spawnFloater(enemy.x, enemy.y, fromBehind ? 'SILENT' : 'TAKEDOWN', '#8effc0');
-    // A loud-ish takedown from the front makes a small noise nearby enemies hear.
-    if (!fromBehind) this.emitSound(enemy.x, enemy.y, TILE * 2.4, 'step');
-    this.intelEarned += fromBehind ? 12 : 8;
+    this.intelEarned += fromBehind ? 12 : 9;
   }
 
-  enemyFire(enemy, player) {
-    // Enemy shoots a slow tracer at the player's current position.
-    const a = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  // --- Signature projectiles ---
+  fireProjectile(player, angle) {
+    const def = player.hero.projectile;
+    const mods = player.mods;
+    this.audio.throwSfx();
+    const ox = player.x + Math.cos(angle) * 18, oy = player.y + Math.sin(angle) * 18;
+
+    if (def.type === 'billyclub') {
+      const count = mods.clubCount;
+      const bounces = def.bounces + mods.clubBounce;
+      const spread = 0.22;
+      for (let i = 0; i < count; i++) {
+        const a = angle + (count > 1 ? (i - (count - 1) / 2) * spread : 0);
+        this.projectiles.push({
+          type: 'billyclub', x: ox, y: oy,
+          vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
+          bounces, hit: [], spin: 0, life: 2.6,
+        });
+      }
+    } else if (def.type === 'batarang') {
+      this.projectiles.push({
+        type: 'batarang', x: ox, y: oy,
+        vx: Math.cos(angle) * def.speed, vy: Math.sin(angle) * def.speed,
+        speed: def.speed, hitsLeft: mods.batTargets, hit: [], phase: 'out',
+        traveled: 0, range: def.range, spin: 0, life: 5,
+      });
+    } else if (def.type === 'web') {
+      const count = mods.webCount;
+      const spread = 0.16;
+      for (let i = 0; i < count; i++) {
+        const a = angle + (count > 1 ? (i - (count - 1) / 2) * spread : 0);
+        this.projectiles.push({
+          type: 'web', x: ox, y: oy,
+          vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
+          life: def.range / def.speed,
+        });
+      }
+    }
+  }
+
+  enemyFire(enemy, playerPos) {
+    const a = Math.atan2(playerPos.y - enemy.y, playerPos.x - enemy.x);
     const speed = 520;
     this.projectiles.push({
+      type: 'bullet', enemy: true,
       x: enemy.x + Math.cos(a) * 18, y: enemy.y + Math.sin(a) * 18,
-      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-      enemy: true, life: 1.2, dmg: 9,
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 1.2, dmg: 9,
     });
     this.audio.hit();
     this.emitSound(enemy.x, enemy.y, TILE * 5, 'alarm');
   }
 
-  spawnProjectile(x, y, angle, range, stun) {
-    const speed = 780;
-    this.projectiles.push({
-      x: x + Math.cos(angle) * 18, y: y + Math.sin(angle) * 18,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      enemy: false, life: range / speed, stun,
-    });
+  _koEnemy(e, x, y, label) {
+    e.takeDown();
+    this.audio.takedown();
+    this.spawnFloater(x, y, label, '#ffd27a');
+    this.intelEarned += 8;
+    this.emitSound(x, y, TILE * 3, 'alarm'); // ranged KOs make noise
   }
 
   _updateProjectiles(dt) {
-    for (const pr of this.projectiles) {
-      pr.x += pr.vx * dt;
-      pr.y += pr.vy * dt;
-      pr.life -= dt;
-      if (this.map.isBlockedWorld(pr.x, pr.y)) { pr.life = 0; continue; }
-      if (pr.enemy) {
-        // Hit the player?
-        if (dist(pr.x, pr.y, this.player.x, this.player.y) < this.player.radius + 4) {
-          this._damagePlayer(pr.dmg);
-          pr.life = 0;
-        }
-      } else {
-        // Player gadget: stun the first enemy hit.
+    const map = this.map;
+    for (const p of this.projectiles) {
+      if (p.type === 'billyclub') {
+        p.spin += dt * 22;
+        // Axis-separated wall bounce.
+        let nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
+        let bounced = false;
+        if (map.isBlockedWorld(nx, p.y)) { p.vx = -p.vx; bounced = true; }
+        if (map.isBlockedWorld(p.x, ny)) { p.vy = -p.vy; bounced = true; }
+        if (bounced) { if (--p.bounces < 0) { p.life = 0; continue; } this.audio.hit(); }
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        // Enemy hits.
         for (const e of this.enemies) {
-          if (e.downed) continue;
-          if (dist(pr.x, pr.y, e.x, e.y) < e.radius + 5) {
-            e.stunFor(pr.stun);
-            this.audio.hit();
-            this.spawnFloater(e.x, e.y, 'STUN', '#bfe0ff');
-            this.emitSound(e.x, e.y, TILE * 2, 'step');
-            pr.life = 0;
+          if (e.downed || p.hit.includes(e)) continue;
+          if (dist(p.x, p.y, e.x, e.y) < e.radius + 8) {
+            p.hit.push(e);
+            this._koEnemy(e, e.x, e.y, 'KO');
+            // Ricochet off the enemy: keep momentum with a small scatter so a
+            // well-aimed throw ploughs through a line, counting one bounce each.
+            const sp = Math.hypot(p.vx, p.vy);
+            const a = Math.atan2(p.vy, p.vx) + (Math.random() - 0.5) * 0.7;
+            p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+            if (--p.bounces < 0) { p.life = 0; }
             break;
           }
         }
+        p.life -= dt;
+      } else if (p.type === 'batarang') {
+        p.spin += dt * 26;
+        const sp = p.speed;
+        if (p.phase === 'out') {
+          // Steer toward nearest live enemy not yet hit.
+          let tgt = null, td = 1e9;
+          for (const e of this.enemies) {
+            if (e.downed || p.hit.includes(e)) continue;
+            const d = dist(p.x, p.y, e.x, e.y);
+            if (d < td) { td = d; tgt = e; }
+          }
+          if (tgt) this._steer(p, tgt.x, tgt.y, sp, dt, 9);
+          p.x += p.vx * dt; p.y += p.vy * dt; p.traveled += sp * dt;
+          if (map.isBlockedWorld(p.x, p.y)) { // bounce off walls gently while seeking
+            const a = Math.atan2(p.vy, p.vx) + Math.PI;
+            p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+          }
+          for (const e of this.enemies) {
+            if (e.downed || p.hit.includes(e)) continue;
+            if (dist(p.x, p.y, e.x, e.y) < e.radius + 7) {
+              p.hit.push(e); this._koEnemy(e, e.x, e.y, 'KO');
+              if (--p.hitsLeft <= 0) p.phase = 'back';
+            }
+          }
+          if (!tgt || p.traveled > p.range) p.phase = 'back';
+        } else {
+          // Return to the player.
+          this._steer(p, this.player.x, this.player.y, sp, dt, 12);
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          for (const e of this.enemies) {
+            if (e.downed || p.hit.includes(e)) continue;
+            if (dist(p.x, p.y, e.x, e.y) < e.radius + 7) { p.hit.push(e); this._koEnemy(e, e.x, e.y, 'KO'); }
+          }
+          if (dist(p.x, p.y, this.player.x, this.player.y) < 20) p.life = 0;
+        }
+        p.life -= dt;
+      } else if (p.type === 'web') {
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (map.isBlockedWorld(p.x, p.y)) { p.life = 0; this.spawnFloater(p.x, p.y, '·', '#dfe6ff'); }
+        for (const e of this.enemies) {
+          if (e.downed) continue;
+          if (dist(p.x, p.y, e.x, e.y) < e.radius + 6) { this._koEnemy(e, e.x, e.y, 'WEBBED'); p.life = 0; break; }
+        }
+        p.life -= dt;
+      } else if (p.type === 'bullet') {
+        p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+        if (map.isBlockedWorld(p.x, p.y)) { p.life = 0; continue; }
+        if (dist(p.x, p.y, this.player.x, this.player.y) < this.player.radius + 4) { this._damagePlayer(p.dmg); p.life = 0; }
       }
     }
     this.projectiles = this.projectiles.filter((p) => p.life > 0);
+  }
+
+  // Rotate a projectile's velocity toward a target at a max turn rate.
+  _steer(p, tx, ty, sp, dt, turn) {
+    const want = Math.atan2(ty - p.y, tx - p.x);
+    let cur = Math.atan2(p.vy, p.vx);
+    let d = want - cur;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    cur += clamp(d, -turn * dt, turn * dt);
+    p.vx = Math.cos(cur) * sp; p.vy = Math.sin(cur) * sp;
   }
 
   _damagePlayer(dmg) {
@@ -2379,52 +2591,33 @@ class Game {
   }
 
   // --- Sound & alarm ---
-
-  emitSound(x, y, radius, type) {
-    this.sounds.push({ x, y, radius, type, life: 0.25 });
-  }
-
-  _decaySounds(dt) {
-    for (const s of this.sounds) s.life -= dt;
-    this.sounds = this.sounds.filter((s) => s.life > 0);
-  }
+  emitSound(x, y, radius, type) { this.sounds.push({ x, y, radius, type, life: 0.25 }); }
+  _decaySounds(dt) { for (const s of this.sounds) s.life -= dt; this.sounds = this.sounds.filter((s) => s.life > 0); }
 
   raiseAlarm(source) {
     this.alarm = 1;
     this.alertPings.push({ x: source.x, y: source.y, life: 0.9, max: 0.9 });
     this.audio.alert();
-    // Nearby patrolling enemies converge on the source.
     for (const e of this.enemies) {
       if (e.downed || e === source) continue;
       if (dist(e.x, e.y, source.x, source.y) < TILE * 8) {
         e.lastKnown = { x: source.x, y: source.y };
         if (e.state === STATE.PATROL || e.state === STATE.IDLE || e.state === STATE.SUSPICIOUS) {
           e.suspicion = Math.max(e.suspicion, 0.5);
-          e.state = STATE.SEARCHING;
-          e.stateTimer = 0;
+          e.state = STATE.SEARCHING; e.stateTimer = 0;
         }
       }
     }
   }
 
   _updateAlarm(dt) {
-    // Alarm cools down when nobody is alerted/combat.
-    const anyHot = this.enemies.some((e) => !e.downed && (e.state === STATE.COMBAT || e.state === STATE.ALERTED));
-    if (anyHot) this.alarm = 1;
-    else this.alarm = Math.max(0, this.alarm - dt * 0.25);
+    const hot = this.enemies.some((e) => !e.downed && (e.state === STATE.COMBAT || e.state === STATE.ALERTED));
+    if (hot) this.alarm = 1; else this.alarm = Math.max(0, this.alarm - dt * 0.25);
   }
 
   // --- Gadgets ---
-
-  spawnSmoke(x, y, radius, duration) {
-    this.smokes.push({ x, y, radius, duration, life: duration });
-    this.spawnFloater(x, y, 'SMOKE', '#cfd6e6');
-  }
-
-  spawnWebTrap(x, y, duration, rootTime) {
-    this.webTraps.push({ x, y, radius: 34, duration, life: duration, rootTime, armed: true });
-    this.spawnFloater(x, y, 'WEB TRAP', '#e6ebff');
-  }
+  spawnSmoke(x, y, radius, duration) { this.smokes.push({ x, y, radius, duration, life: duration }); this.spawnFloater(x, y, 'SMOKE', '#cfd6e6'); }
+  spawnWebTrap(x, y, duration, rootTime, radius) { this.webTraps.push({ x, y, radius: radius || 34, duration, life: duration, rootTime, armed: true }); this.spawnFloater(x, y, 'WEB TRAP', '#e6ebff'); }
 
   _checkWebTraps() {
     for (const w of this.webTraps) {
@@ -2432,43 +2625,28 @@ class Game {
       for (const e of this.enemies) {
         if (e.downed) continue;
         if (dist(w.x, w.y, e.x, e.y) < w.radius) {
-          e.rooted = w.rootTime;
-          w.armed = false;
-          this.audio.gadget();
-          this.spawnFloater(e.x, e.y, 'ROOTED', '#e6ebff');
+          e.rooted = w.rootTime; w.armed = false;
+          this.audio.gadget(); this.spawnFloater(e.x, e.y, 'ROOTED', '#e6ebff');
           break;
         }
       }
     }
   }
 
-  spawnZipTrail(x, y) {
-    this.zipTrails.push({ x, y, life: 1 });
-  }
-
-  spawnFloater(x, y, text, color) {
-    this.floaters.push({ x, y, text, color, life: 1 });
-  }
+  spawnZipTrail(x, y) { this.zipTrails.push({ x, y, life: 1 }); }
+  spawnFloater(x, y, text, color) { this.floaters.push({ x, y, text, color, life: 1 }); }
 
   _updateEffects(dt) {
-    for (const s of this.smokes) s.life -= dt;
-    this.smokes = this.smokes.filter((s) => s.life > 0);
-    for (const w of this.webTraps) w.life -= dt;
-    this.webTraps = this.webTraps.filter((w) => w.life > 0);
-    for (const t of this.zipTrails) t.life -= dt * 2.2;
-    this.zipTrails = this.zipTrails.filter((t) => t.life > 0);
-    for (const a of this.alertPings) a.life -= dt;
-    this.alertPings = this.alertPings.filter((a) => a.life > 0);
-    for (const f of this.floaters) { f.y -= dt * 24; f.life -= dt * 0.8; }
-    this.floaters = this.floaters.filter((f) => f.life > 0);
+    for (const s of this.smokes) s.life -= dt; this.smokes = this.smokes.filter((s) => s.life > 0);
+    for (const w of this.webTraps) w.life -= dt; this.webTraps = this.webTraps.filter((w) => w.life > 0);
+    for (const t of this.zipTrails) t.life -= dt * 2.2; this.zipTrails = this.zipTrails.filter((t) => t.life > 0);
+    for (const a of this.alertPings) a.life -= dt; this.alertPings = this.alertPings.filter((a) => a.life > 0);
+    for (const f of this.floaters) { f.y -= dt * 24; f.life -= dt * 0.8; } this.floaters = this.floaters.filter((f) => f.life > 0);
   }
-
-  // --- End states ---
 
   _win() {
     this.state = 'complete';
     this.audio.win();
-    // Reward: base + stealth bonus + level bonus.
     const stealthBonus = this.detections === 0 ? 60 : Math.max(0, 40 - this.detections * 8);
     this.intelEarned += 30 + this.level * 10 + stealthBonus;
     this.progression.addIntel(this.intelEarned);
@@ -2480,7 +2658,6 @@ class Game {
     if (this.state !== 'playing') return;
     this.state = 'failed';
     this.audio.lose();
-    // Small consolation intel.
     this.intelEarned = Math.floor(this.intelEarned * 0.4);
     this.progression.addIntel(this.intelEarned);
     this.lastResult = { win: false, intel: this.intelEarned };
@@ -2529,6 +2706,7 @@ function show(id) {
 
 function $(id) { return document.getElementById(id); }
 function intelStr() { return '⬡ ' + progression.data.intel; }
+function clampFrac(v, max) { return max > 0 ? Math.max(0, Math.min(1, v / max)) : 0; }
 
 // ---------- Resize ----------
 function resize() { renderer.resize(); }
@@ -2571,7 +2749,7 @@ function buildHeroes() {
       <div class="hero-info">
         <div class="hero-name">${h.name} <span class="hero-tag">${h.tag}</span></div>
         <div class="hero-desc">${h.desc}</div>
-        <div class="hero-desc" style="color:#8fa0c0">◎ ${h.ability.name} · ➤ ${h.grapple.name}</div>
+        <div class="hero-desc" style="color:#8fa0c0">◎ ${h.ability.name} · ⇱ ${h.traversal.name} · ➤ ${h.projectile.name}</div>
       </div>
       <div class="hero-cta"></div>`;
     const cta = card.querySelector('.hero-cta');
@@ -2600,13 +2778,31 @@ function buildHeroes() {
 }
 
 // ---------- Upgrades ----------
+// Which hero the upgrades screen is currently showing.
+let upgHeroId = null;
+
 function buildUpgrades() {
   $('upg-intel').textContent = intelStr();
+  if (!upgHeroId || !progression.isUnlocked(upgHeroId)) upgHeroId = progression.data.selectedHero;
+
+  // Hero tabs (only unlocked heroes can be upgraded).
+  const tabs = $('upg-tabs');
+  tabs.innerHTML = '';
+  for (const id of HERO_ORDER) {
+    const h = HEROES[id];
+    const unlocked = progression.isUnlocked(id);
+    const tab = document.createElement('div');
+    tab.className = 'hero-tab' + (id === upgHeroId ? ' active' : '') + (unlocked ? '' : ' locked');
+    tab.textContent = h.name;
+    if (unlocked) tab.onclick = () => { audio.ui(); upgHeroId = id; buildUpgrades(); };
+    tabs.appendChild(tab);
+  }
+
+  const hero = HEROES[upgHeroId];
   const list = $('upg-list');
   list.innerHTML = '';
-  for (const key of Object.keys(UPGRADE_DEFS)) {
-    const def = UPGRADE_DEFS[key];
-    const lvl = progression.upgradeLevel(key);
+  for (const def of hero.upgrades) {
+    const lvl = progression.upgradeLevel(upgHeroId, def.key);
     const maxed = lvl >= def.max;
     const cost = maxed ? 0 : def.cost(lvl);
     const card = document.createElement('div');
@@ -2629,7 +2825,7 @@ function buildUpgrades() {
       b.textContent = '⬡' + cost;
       const afford = progression.data.intel >= cost;
       b.disabled = !afford; if (!afford) b.style.opacity = 0.5;
-      b.onclick = () => { if (progression.buyUpgrade(key)) { audio.gadget(); buildUpgrades(); } else audio.lose(); };
+      b.onclick = () => { if (progression.buyUpgrade(upgHeroId, def.key)) { audio.gadget(); buildUpgrades(); } else audio.lose(); };
       cta.appendChild(b);
     }
     list.appendChild(card);
@@ -2644,10 +2840,14 @@ function startGame(level) {
   game = new Game({ input, audio, renderer, progression, heroId: progression.data.selectedHero, level });
   renderer.cam.x = game.player.x - renderer.vw / 2;
   renderer.cam.y = game.player.y - renderer.vh / 2;
-  // Configure ability/gadget labels.
+  // Configure action button labels + glyphs for this hero.
   const hero = HEROES[progression.data.selectedHero];
-  $('ability-lbl').textContent = hero.ability.name.split(' ')[0];
-  $('grapple-lbl').textContent = hero.grapple.name.split(' ')[0];
+  const abilityShort = { radar: 'Radar', smoke: 'Smoke', webtrap: 'Trap' };
+  const weaponShort = { billyclub: 'Club', batarang: 'Batarang', web: 'Web' };
+  $('ability-lbl').textContent = abilityShort[hero.ability.type] || hero.ability.name;
+  $('jump-lbl').textContent = hero.traversal.type === 'grapple' ? 'Grapple' : 'Web Zip';
+  $('jump-glyph').textContent = hero.traversal.type === 'grapple' ? '⇱' : '➰';
+  $('grapple-lbl').textContent = weaponShort[hero.projectile.type] || hero.projectile.name;
   $('hud-hero').textContent = hero.name;
   $('hud-level').textContent = 'Sector ' + level;
   show('game');
@@ -2666,13 +2866,11 @@ function updateHUD(dt) {
   alarmLbl.textContent = game.alarm > 0.66 ? 'ALARM' : game.alarm > 0.15 ? 'ALERT' : 'CALM';
   alarmLbl.style.color = game.alarm > 0.66 ? 'var(--danger)' : game.alarm > 0.15 ? 'var(--warn)' : 'var(--dim)';
 
-  // Cooldown rings.
-  const mods = progression.mods();
-  const hero = game.player.hero;
-  const aMax = hero.ability.cooldown * mods.cooldownMult;
-  const gMax = hero.grapple.cooldown * mods.cooldownMult;
-  $('cd-ability').style.transform = `scaleY(${game.player.cdAbility / aMax})`;
-  $('cd-grapple').style.transform = `scaleY(${game.player.cdGrapple / gMax})`;
+  // Cooldown rings (read straight from the player's timers).
+  const pl = game.player;
+  $('cd-ability').style.transform = `scaleY(${clampFrac(pl.cdAbility, pl.abilityMax)})`;
+  $('cd-jump').style.transform = `scaleY(${clampFrac(pl.cdTraverse, pl.traverseMax)})`;
+  $('cd-grapple').style.transform = `scaleY(${clampFrac(pl.cdProjectile, pl.projectileMax)})`;
 
   // Detection warning.
   const spotted = game.enemies.some((e) => !e.downed && (e.state === 'Combat' || e.state === 'Alerted') && e.canSeePlayer);

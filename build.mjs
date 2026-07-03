@@ -18,6 +18,7 @@ const order = [
   'src/input.js',
   'src/entities/enemy.js',
   'src/entities/player.js',
+  'src/sprites.js',
   'src/render.js',
   'src/game.js',
   'src/main.js',

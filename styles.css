@@ -101,6 +101,10 @@ html, body {
 .badge.cost { background: rgba(107,208,255,0.14); color: var(--accent-2); }
 
 /* ---------- Upgrades ---------- */
+.hero-tabs { width: min(560px, 94vw); display: flex; gap: 8px; margin-bottom: 4px; }
+.hero-tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); color: var(--dim); font-weight: 800; font-size: 13px; letter-spacing: 1px; cursor: pointer; text-align: center; }
+.hero-tab.active { color: var(--text); border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2); }
+.hero-tab.locked { opacity: 0.4; }
 .upg-card { padding: 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
 .upg-info { flex: 1; }
 .upg-name { font-weight: 800; }
