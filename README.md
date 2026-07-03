@@ -10,8 +10,16 @@ Fast (1–3 min) missions, instant restarts, hero-based abilities.
 
 ## Play it
 
-It's a static site — just serve the folder and open it in a browser (mobile or
-desktop):
+**Easiest — the single-file build.** `game.html` is the entire game inlined into
+one file (no server needed). Download it and open it in any browser — including
+by double-clicking it locally.
+
+```bash
+node build.mjs   # regenerates game.html from src/ (only needed if you edit source)
+```
+
+**The modular source** (everything under `src/`) needs an `http://` origin
+because it uses ES module imports, so serve the folder:
 
 ```bash
 # from the repo root
@@ -19,8 +27,8 @@ python3 -m http.server 8099
 # then open http://localhost:8099 on your phone or desktop
 ```
 
-> ES modules require an `http://` origin, so open it through a server rather than
-> a `file://` path.
+> To publish it publicly for phone play, enable **GitHub Pages** on this branch
+> (Settings → Pages → Deploy from a branch), or host `game.html` anywhere static.
 
 ## Controls
 
