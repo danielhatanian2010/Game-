@@ -19,14 +19,15 @@ let paused = false;
 let screen = 'menu';
 
 // ---------- Screen helpers ----------
-const screens = ['menu', 'heroes', 'upgrades', 'how', 'pause', 'results'];
+const screens = ['menu', 'heroes', 'upgrades', 'how', 'pause', 'results', 'fieldupg'];
+const OVERLAYS = new Set(['pause', 'results', 'fieldupg']); // keep game frame behind
 function show(id) {
   for (const s of screens) document.getElementById(s).classList.add('hidden');
   const hud = document.getElementById('hud');
   if (id === 'game') {
     hud.classList.remove('hidden');
   } else {
-    if (id !== 'pause' && id !== 'results') hud.classList.add('hidden');
+    if (!OVERLAYS.has(id)) hud.classList.add('hidden');
     document.getElementById(id).classList.remove('hidden');
   }
   screen = id;
@@ -177,7 +178,7 @@ function startGame(level) {
   $('jump-glyph').textContent = hero.traversal.type === 'grapple' ? '⇱' : '➰';
   $('grapple-lbl').textContent = weaponShort[hero.projectile.type] || hero.projectile.name;
   $('hud-hero').textContent = hero.name;
-  $('hud-level').textContent = 'Sector ' + level;
+  $('hud-level').textContent = 'Floor 1/' + game.floorsTotal;
   show('game');
 }
 
@@ -185,8 +186,14 @@ function startGame(level) {
 let warnBlink = 0;
 function updateHUD(dt) {
   if (!game) return;
-  $('hud-enemies').textContent = 'Enemies: ' + game.enemiesRemaining();
+  const remaining = game.enemiesRemaining();
+  $('hud-enemies').textContent = remaining > 0 ? 'Enemies: ' + remaining : 'Reach the LIFT ▲';
+  $('hud-level').textContent = 'Floor ' + game.floor + '/' + game.floorsTotal;
   $('hud-intel').textContent = '⬡ ' + (progression.data.intel + game.intelEarned);
+  // Floor banner.
+  const banner = $('floor-banner');
+  if (game.floorBanner > 0) { banner.textContent = 'FLOOR ' + game.floor; banner.classList.remove('hidden'); }
+  else banner.classList.add('hidden');
   const hp = Math.max(0, game.playerHealth / game.playerHealthMax);
   $('hp-fill').style.width = (hp * 100) + '%';
   $('alarm-fill').style.width = (game.alarm * 100) + '%';
@@ -215,15 +222,29 @@ $('btn-mute').onclick = () => {
   $('btn-mute').textContent = 'Sound: ' + (audio.muted ? 'OFF' : 'ON');
 };
 
+// ---------- Field upgrade (mid-run) ----------
+function showFieldUpgrade() {
+  const list = $('fieldupg-list');
+  list.innerHTML = '';
+  for (const perk of game.runPerkChoices()) {
+    const card = document.createElement('div');
+    card.className = 'upg-card fieldupg-card';
+    card.innerHTML = `<div class="upg-info"><div class="upg-name">${perk.name}</div><div class="upg-desc">${perk.desc}</div></div><div class="upg-cta">➤</div>`;
+    card.onclick = () => { audio.gadget(); game.applyPerk(perk.id); show('game'); };
+    list.appendChild(card);
+  }
+  show('fieldupg');
+}
+
 // ---------- Results ----------
 function showResults() {
   const r = game.lastResult;
   const title = $('result-title');
-  if (r.win) { title.textContent = 'SECTOR CLEARED'; title.className = 'result-title win'; }
+  if (r.win) { title.textContent = 'BUILDING SECURED'; title.className = 'result-title win'; }
   else { title.textContent = 'MISSION FAILED'; title.className = 'result-title lose'; }
   $('result-sub').textContent = r.win
-    ? (r.stealth ? 'Flawless — never detected.' : 'Extracted after ' + game.detections + ' contact(s).')
-    : 'You were taken down. Regroup and try again.';
+    ? (r.stealth ? `All ${r.floors} floors cleared — never detected.` : `Reached the roof after ${game.detections} contact(s).`)
+    : `Taken down on floor ${game.floor}. Regroup and try again.`;
   const stats = $('result-stats');
   stats.innerHTML = `
     <div class="row"><span>Intel earned</span><span>⬡ ${r.intel}</span></div>
@@ -244,20 +265,28 @@ function loop(now) {
   last = now;
   dt = Math.min(dt, 0.05); // clamp big frame gaps
 
-  if (game && screen === 'game' && !paused) {
-    if (game.state === 'playing') {
-      resultsShown = false;
-      game.update(dt);
-      updateHUD(dt);
-    } else if (!resultsShown) {
-      resultsShown = true;
-      updateHUD(dt);
-      setTimeout(showResults, 700); // brief beat before the panel
+  try {
+    if (game && screen === 'game' && !paused) {
+      if (game.state === 'playing') {
+        resultsShown = false;
+        game.update(dt);
+        updateHUD(dt);
+      } else if (game.state === 'upgrade') {
+        updateHUD(dt);
+        showFieldUpgrade();            // pick-one boost, then next floor
+      } else if (!resultsShown) {
+        resultsShown = true;
+        updateHUD(dt);
+        setTimeout(showResults, 700);  // brief beat before the panel
+      }
+      game.render(dt);
+    } else if (game && OVERLAYS.has(screen)) {
+      // Keep the frozen scene visible behind overlays.
+      game.render(0);
     }
-    game.render(dt);
-  } else if (game && (screen === 'pause' || screen === 'results')) {
-    // Keep the frozen scene visible behind overlays.
-    game.render(0);
+  } catch (err) {
+    // A single bad frame must never permanently freeze the game.
+    console.error(err);
   }
   requestAnimationFrame(loop);
 }

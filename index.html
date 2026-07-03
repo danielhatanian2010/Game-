@@ -26,6 +26,7 @@
       <div class="bar"><span id="alarm-label">CALM</span><div class="bar-track"><div id="alarm-fill" class="bar-fill alarm"></div></div></div>
     </div>
     <div id="detect-warning" class="detect-warning hidden">DETECTED</div>
+    <div id="floor-banner" class="floor-banner hidden"></div>
 
     <!-- Right-side action buttons -->
     <div class="controls">
@@ -53,7 +54,7 @@
       </div>
       <button class="btn ghost" id="btn-how">How to Play</button>
     </div>
-    <div class="foot">Tap START to begin • Clear every enemy, then reach EXTRACT</div>
+    <div class="foot">Tap START • Clear each floor, ride the LIFT up, secure the building</div>
   </div>
 
   <!-- Hero Select -->
@@ -73,8 +74,8 @@
   <div id="how" class="screen hidden">
     <div class="screen-head"><button class="btn back" data-back>‹ Back</button><h2>HOW TO PLAY</h2><div></div></div>
     <div class="how-body">
-      <p><b>Goal:</b> eliminate every enemy in the sector, then reach the glowing <b>EXTRACT</b> pad.</p>
-      <p><b>Move:</b> touch and drag anywhere on the left of the screen — a joystick appears.</p>
+      <p><b>Goal:</b> each sector is a building. Clear a floor's enemies to power up the <b>LIFT ▲</b>, ride up, and repeat until the building is secured. Halfway up you pick a <b>field upgrade</b> for your hero.</p>
+      <p><b>Move:</b> touch and drag anywhere on the left of the screen — a joystick appears. Movement follows the tilted view.</p>
       <p><b>Takedown ✦:</b> sneak up on an enemy and tap. It only works when the enemy <b>can't see you</b> — stay out of their cone.</p>
       <p><b>Grapple / Web-Zip ⇱:</b> fire toward a wall to zip across the map. Warden and Nightfall grapple; Weaver web-zips.</p>
       <p><b>Ability ◎:</b> Radar Sense, Smoke Screen, or Web Trap — hero-specific.</p>
@@ -93,6 +94,15 @@
       <button class="btn" id="btn-restart">RESTART SECTOR</button>
       <button class="btn ghost" id="btn-quit">ABORT TO MENU</button>
       <button class="btn ghost" id="btn-mute">Sound: ON</button>
+    </div>
+  </div>
+
+  <!-- Field upgrade (mid-run, at the halfway floor) -->
+  <div id="fieldupg" class="screen overlay hidden">
+    <div class="menu-card">
+      <div class="result-title" style="color:var(--accent-2)">FIELD UPGRADE</div>
+      <div class="result-sub">Halfway up. Choose one boost — it lasts the rest of the building.</div>
+      <div id="fieldupg-list" class="upg-list"></div>
     </div>
   </div>
 

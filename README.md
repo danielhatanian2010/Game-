@@ -4,9 +4,11 @@ A complete **mobile-first stealth-action game** built from scratch with vanilla
 JavaScript + HTML5 Canvas. No frameworks, no build step, no external assets —
 every graphic and sound is generated procedurally at runtime.
 
-Clear a procedurally generated slice of a dark, rainy city: avoid the vision
-cones, silently take down every masked criminal, then reach the extraction pad.
-Fast (1–3 min) missions, instant restarts, hero-based abilities.
+Infiltrate a procedurally generated building rendered in a tilted **isometric
+2.5D** view: avoid the vision cones, silently take down every masked criminal on
+a floor to power up the **lift**, ride up, and repeat until the building is
+secured. Halfway up you pick a hero **field upgrade**. Instant restarts,
+hero-based abilities.
 
 ## Play it
 

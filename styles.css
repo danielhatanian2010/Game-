@@ -150,6 +150,16 @@ html, body {
   color: var(--danger); font-weight: 900; letter-spacing: 4px; font-size: 26px;
   text-shadow: 0 0 20px rgba(255,60,60,0.6); animation: flash .5s infinite alternate;
 }
+.floor-banner {
+  position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+  color: #fff; font-weight: 900; letter-spacing: 5px; font-size: 30px;
+  text-shadow: 0 2px 24px rgba(120,90,255,0.7); white-space: nowrap;
+  animation: floorpop .5s ease;
+}
+@keyframes floorpop { from { opacity: 0; transform: translateX(-50%) scale(1.3); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+.fieldupg-card { cursor: pointer; transition: transform .06s, border-color .15s; }
+.fieldupg-card:active { transform: scale(0.98); }
+.fieldupg-card:hover { border-color: var(--accent-2); }
 @keyframes flash { from { opacity: .35; } to { opacity: 1; } }
 
 /* Action buttons */

@@ -12,6 +12,7 @@ const order = [
   'src/utils.js',
   'src/heroes.js',
   'src/mapgen.js',
+  'src/iso.js',
   'src/pathfind.js',
   'src/progression.js',
   'src/audio.js',

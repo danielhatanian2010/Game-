@@ -4,6 +4,7 @@
 import { GameMap, TILE } from './mapgen.js';
 import { Player } from './entities/player.js';
 import { Enemy, STATE } from './entities/enemy.js';
+import { RUN_PERKS } from './heroes.js';
 import { makeRng, randInt, clamp, dist } from './utils.js';
 
 export class Game {
@@ -12,19 +13,35 @@ export class Game {
     this.audio = audio;
     this.renderer = renderer;
     this.progression = progression;
-    this.level = level;
+    this.baseLevel = level;   // the sector number
     this.heroId = heroId;
 
-    this.state = 'playing';
+    // A sector is a building of several floors.
+    this.floorsTotal = clamp(3 + Math.floor(level / 2), 3, 6);
+    this.halfwayFloor = Math.ceil(this.floorsTotal / 2);
+    this.floor = 1;
+    this.upgradedThisLevel = false;
+    this.floorBanner = 0;     // >0 while a "FLOOR n" banner shows
+
+    this.state = 'playing';   // playing | upgrade | complete | failed
     this.time = 0;
     this.alarm = 0;
     this.detections = 0;
     this.intelEarned = 0;
 
-    this.seed = (Date.now() ^ (level * 2654435761)) >>> 0;
-    this.rng = makeRng(this.seed);
-    this.map = new GameMap(this.seed, level);
+    this.playerHealthMax = 100;
+    this.playerHealth = 100;
+    this.playerHitFlash = 0;
+    this.player = null;
 
+    this._resetTransient();
+    this.generateFloor(true);
+  }
+
+  // Effective difficulty grows as you climb.
+  get level() { return this.baseLevel + (this.floor - 1); }
+
+  _resetTransient() {
     this.enemies = [];
     this.projectiles = [];
     this.sounds = [];
@@ -33,24 +50,30 @@ export class Game {
     this.zipTrails = [];
     this.alertPings = [];
     this.floaters = [];
-
-    this.playerHealthMax = 100;
-    this.playerHealth = 100;
-    this.playerHitFlash = 0;
-
-    this._spawn();
+    this.alarm = 0;
   }
 
-  _spawn() {
-    const heroMods = this.progression.heroMods(this.heroId);
+  generateFloor(first) {
+    this.seed = (Date.now() ^ (this.level * 2654435761) ^ (this.floor * 40503)) >>> 0;
+    this.rng = makeRng(this.seed);
+    this.map = new GameMap(this.seed, this.level);
+    this._resetTransient();
+
     const start = this.map.randomFloorPos();
-    this.player = new Player(this.heroId, start.x, start.y, heroMods);
+    if (first) {
+      const heroMods = this.progression.heroMods(this.heroId);
+      this.player = new Player(this.heroId, start.x, start.y, heroMods);
+    } else {
+      // Carry the same hero (with any perks) up; reposition + small heal.
+      this.player.x = start.x; this.player.y = start.y;
+      this.player.dashing = null; this.player.rope = null;
+      this.player.cdAbility = this.player.cdTraverse = this.player.cdProjectile = 0;
+      this.playerHealth = Math.min(this.playerHealthMax, this.playerHealth + 30);
+    }
 
     const count = clamp(3 + Math.floor(this.level * 1.2), 3, 12);
     const placed = [{ x: this.player.x, y: this.player.y }];
-    const MIN_APART = TILE * 5.5;   // keep enemies well spread
-    const MIN_FROM_PLAYER = TILE * 6;
-
+    const MIN_APART = TILE * 5.5, MIN_FROM_PLAYER = TILE * 6;
     let guard = 0;
     while (this.enemies.length < count && guard++ < 400) {
       const pos = this.map.randomFloorPos();
@@ -58,26 +81,54 @@ export class Game {
       for (const p of placed) if (dist(pos.x, pos.y, p.x, p.y) < MIN_APART) { ok = false; break; }
       if (!ok) continue;
       placed.push({ x: pos.x, y: pos.y });
-
-      // Patrol loop from nearby floor tiles.
       const wps = [{ x: pos.x, y: pos.y }];
       const n = randInt(this.rng, 2, 3);
-      for (let k = 0; k < n; k++) {
-        const wp = this.map.randomFloorPos(pos, TILE * 2.5);
-        wps.push({ x: wp.x, y: wp.y });
-      }
+      for (let k = 0; k < n; k++) { const wp = this.map.randomFloorPos(pos, TILE * 2.5); wps.push({ x: wp.x, y: wp.y }); }
       this.enemies.push(new Enemy(pos.x, pos.y, wps, {
         visionRange: TILE * (3.8 + Math.min(this.level * 0.12, 1.6)),
         visionHalf: 0.6,
         speed: 70 + Math.min(this.level * 2, 30),
       }));
     }
-    // If spacing was too strict for a tiny map, relax and top up.
     guard = 0;
     while (this.enemies.length < 3 && guard++ < 100) {
       const pos = this.map.randomFloorPos({ x: this.player.x, y: this.player.y }, TILE * 4);
       this.enemies.push(new Enemy(pos.x, pos.y, [{ x: pos.x, y: pos.y }], { visionRange: TILE * 4, visionHalf: 0.6, speed: 74 }));
     }
+    this.floorBanner = 2;
+  }
+
+  // Offered at the halfway floor.
+  runPerkChoices() { return RUN_PERKS[this.heroId] || []; }
+
+  applyPerk(id) {
+    const perk = (RUN_PERKS[this.heroId] || []).find((p) => p.id === id);
+    if (perk) { perk.apply(this.player.mods); this.player.applyMods(); }
+    this.upgradedThisLevel = true;
+    this.state = 'playing';
+    this.nextFloor();
+  }
+
+  nextFloor() {
+    if (this.floor >= this.floorsTotal) { this._win(); return; }
+    this.floor++;
+    this.audio.win();
+    this.generateFloor(false);
+  }
+
+  // Called when the player steps into an active elevator.
+  _useElevator() {
+    if (this.floor === this.halfwayFloor && !this.upgradedThisLevel) {
+      this.state = 'upgrade'; // main.js shows the field-upgrade screen
+      return;
+    }
+    this.nextFloor();
+  }
+
+  _checkElevator() {
+    if (this.enemiesRemaining() !== 0 || !this.map.extract) return;
+    const ex = (this.map.extract.gx + 0.5) * TILE, ey = (this.map.extract.gy + 0.5) * TILE;
+    if (dist(this.player.x, this.player.y, ex, ey) < TILE * 0.8) this._useElevator();
   }
 
   enemiesRemaining() { return this.enemies.filter((e) => !e.downed).length; }
@@ -101,10 +152,9 @@ export class Game {
     for (const e of this.enemies) if (!e.downed && e.canSeePlayer) exposure = Math.max(exposure, e.suspicion);
     this.player.detectionMeter = exposure;
 
-    if (this.enemiesRemaining() === 0) {
-      const ex = (this.map.extract.gx + 0.5) * TILE, ey = (this.map.extract.gy + 0.5) * TILE;
-      if (dist(this.player.x, this.player.y, ex, ey) < TILE * 0.8) this._win();
-    }
+    if (this.floorBanner > 0) this.floorBanner -= dt;
+
+    this._checkElevator();
     if (this.playerHealth <= 0) this._lose();
 
     this.input.clearActions();
@@ -335,11 +385,11 @@ export class Game {
   _win() {
     this.state = 'complete';
     this.audio.win();
-    const stealthBonus = this.detections === 0 ? 60 : Math.max(0, 40 - this.detections * 8);
-    this.intelEarned += 30 + this.level * 10 + stealthBonus;
+    const stealthBonus = this.detections === 0 ? 80 : Math.max(0, 50 - this.detections * 8);
+    this.intelEarned += 40 + this.baseLevel * 12 + this.floorsTotal * 10 + stealthBonus;
     this.progression.addIntel(this.intelEarned);
-    this.progression.recordLevel(this.level + 1);
-    this.lastResult = { win: true, intel: this.intelEarned, stealth: this.detections === 0, detections: this.detections };
+    this.progression.recordLevel(this.baseLevel + 1);
+    this.lastResult = { win: true, intel: this.intelEarned, stealth: this.detections === 0, detections: this.detections, floors: this.floorsTotal };
   }
 
   _lose() {

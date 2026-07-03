@@ -6,6 +6,7 @@
 
 import { HEROES } from '../heroes.js';
 import { TILE } from '../mapgen.js';
+import { screenDirToWorld } from '../iso.js';
 import { clamp, angleDiff } from '../utils.js';
 
 export class Player {
@@ -38,6 +39,12 @@ export class Player {
     this.detectionMeter = 0;
   }
 
+  // Recompute derived stats after mods change (e.g. a mid-run perk).
+  applyMods() {
+    this.speed = this.hero.speed * this.mods.speedMult;
+    this.traverseMax = this.hero.traversal.cooldown * (this.hero.traversal.type === 'grapple' ? this.mods.grappleCd : 1);
+  }
+
   get takedownRange() { return 46; }
 
   update(dt, input, game) {
@@ -51,13 +58,14 @@ export class Player {
     if (this.dashing) {
       this._updateDash(dt, game);
     } else {
-      let mx = input.move.x, my = input.move.y;
-      const mag = Math.hypot(mx, my);
-      this.moving = mag > 0.05;
+      const inMag = Math.hypot(input.move.x, input.move.y);
+      this.moving = inMag > 0.05;
       if (this.moving) {
-        this.angle = Math.atan2(my, mx);
-        const spd = this.speed * clamp(mag, 0, 1);
-        this._moveWithCollision(mx / (mag || 1) * spd * dt, my / (mag || 1) * spd * dt, game);
+        // Joystick is screen-space; convert to a world direction along the iso grid.
+        const dir = screenDirToWorld(input.move.x, input.move.y);
+        this.angle = Math.atan2(dir.y, dir.x);
+        const spd = this.speed * clamp(inMag, 0, 1);
+        this._moveWithCollision(dir.x * spd * dt, dir.y * spd * dt, game);
       }
     }
 

@@ -70,3 +70,23 @@ export const HEROES = {
 };
 
 export const HERO_ORDER = ['daredevil', 'bat', 'spider'];
+
+// Mid-run "field upgrades" offered at the halfway floor. Pick one; it modifies
+// the player's mods for the rest of the building. Hero-specific.
+export const RUN_PERKS = {
+  daredevil: [
+    { id: 'triClub', name: 'Triple Clubs', desc: 'Throw three billy clubs at once', apply: (m) => { m.clubCount = Math.max(m.clubCount, 3); } },
+    { id: 'ricochet', name: 'Wild Ricochet', desc: '+2 club bounces', apply: (m) => { m.clubBounce += 2; } },
+    { id: 'deepRadar', name: 'Deep Radar', desc: 'Radar Sense lasts +3s', apply: (m) => { m.radarBonus += 3; } },
+  ],
+  bat: [
+    { id: 'twinBat', name: 'Swarm Batarang', desc: 'Batarang strikes +2 targets', apply: (m) => { m.batTargets += 2; } },
+    { id: 'denseSmoke', name: 'Dense Smoke', desc: 'Bigger, longer smoke screen', apply: (m) => { m.smokeBonus += 2; } },
+    { id: 'ghost', name: 'Ghost Step', desc: 'Enemies notice you much slower', apply: (m) => { m.suspicionMult *= 0.7; } },
+  ],
+  spider: [
+    { id: 'twinWeb', name: 'Triple Web', desc: 'Fire two extra web strands', apply: (m) => { m.webCount += 2; } },
+    { id: 'wideTrap', name: 'Wide Web', desc: 'Bigger trap, longer root', apply: (m) => { m.trapBonus += 2; } },
+    { id: 'longZip', name: 'Long Line', desc: 'Web-zip reaches much farther', apply: (m) => { m.zipBonus += 0.5; } },
+  ],
+};
