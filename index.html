@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#080a12" />
+  <title>NIGHTFALL — Stealth Ops</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- In-mission HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-pill" id="hud-enemies">Enemies: 0</div>
+      <div class="hud-pill" id="hud-level">Lv 1</div>
+      <div class="hud-pill" id="hud-hero">Hero</div>
+      <div class="hud-pill" id="hud-intel">⬡ 0</div>
+      <button class="hud-icon" id="btn-pause" aria-label="Pause">❚❚</button>
+    </div>
+    <div class="hud-bars">
+      <div class="bar"><span>HP</span><div class="bar-track"><div id="hp-fill" class="bar-fill hp"></div></div></div>
+      <div class="bar"><span id="alarm-label">CALM</span><div class="bar-track"><div id="alarm-fill" class="bar-fill alarm"></div></div></div>
+    </div>
+    <div id="detect-warning" class="detect-warning hidden">DETECTED</div>
+
+    <!-- Right-side action buttons -->
+    <div class="controls">
+      <button class="ctrl-btn attack" id="btn-attack"><span class="glyph">✦</span><span class="lbl">Takedown</span></button>
+      <button class="ctrl-btn jump" id="btn-jump"><span class="glyph">⤴</span><span class="lbl">Dash</span></button>
+      <button class="ctrl-btn ability" id="btn-ability"><span class="glyph">◎</span><span class="lbl" id="ability-lbl">Ability</span><span class="cd" id="cd-ability"></span></button>
+      <button class="ctrl-btn grapple" id="btn-grapple"><span class="glyph">➤</span><span class="lbl" id="grapple-lbl">Gadget</span><span class="cd" id="cd-grapple"></span></button>
+    </div>
+  </div>
+
+  <!-- Main Menu -->
+  <div id="menu" class="screen">
+    <div class="brand">
+      <div class="brand-title">NIGHTFALL</div>
+      <div class="brand-sub">STEALTH OPS</div>
+    </div>
+    <div class="menu-card">
+      <div class="menu-hero-line" id="menu-hero-line">Warden</div>
+      <div class="menu-row"><span>Best Sector</span><span id="menu-best">1</span></div>
+      <div class="menu-row"><span>Intel</span><span id="menu-intel">⬡ 0</span></div>
+      <button class="btn primary big" id="btn-play">START MISSION</button>
+      <div class="menu-actions">
+        <button class="btn" id="btn-heroes">HEROES</button>
+        <button class="btn" id="btn-upgrades">UPGRADES</button>
+      </div>
+      <button class="btn ghost" id="btn-how">How to Play</button>
+    </div>
+    <div class="foot">Tap START to begin • Clear every enemy, then reach EXTRACT</div>
+  </div>
+
+  <!-- Hero Select -->
+  <div id="heroes" class="screen hidden">
+    <div class="screen-head"><button class="btn back" data-back>‹ Back</button><h2>HEROES</h2><div class="intel-tag" id="heroes-intel">⬡ 0</div></div>
+    <div class="hero-list" id="hero-list"></div>
+  </div>
+
+  <!-- Upgrades -->
+  <div id="upgrades" class="screen hidden">
+    <div class="screen-head"><button class="btn back" data-back>‹ Back</button><h2>UPGRADES</h2><div class="intel-tag" id="upg-intel">⬡ 0</div></div>
+    <div class="upg-list" id="upg-list"></div>
+  </div>
+
+  <!-- How to play -->
+  <div id="how" class="screen hidden">
+    <div class="screen-head"><button class="btn back" data-back>‹ Back</button><h2>HOW TO PLAY</h2><div></div></div>
+    <div class="how-body">
+      <p><b>Goal:</b> eliminate every enemy in the sector, then reach the glowing <b>EXTRACT</b> pad.</p>
+      <p><b>Move:</b> touch and drag anywhere on the left of the screen — a joystick appears.</p>
+      <p><b>Takedown ✦:</b> get close to an enemy and tap. From behind it's silent; from the front it's risky.</p>
+      <p><b>Dash ⤴:</b> quick burst to vault gaps and dodge.</p>
+      <p><b>Ability ◎ / Gadget ➤:</b> hero-specific. Watch the cooldown ring.</p>
+      <p><b>Stealth:</b> stay out of the yellow vision cones and out of the light. Cones turn <span style="color:#ffb020">orange</span> when suspicious and <span style="color:#ff5050">red</span> when you're spotted. Get shot and your HP drops — lose it all and the mission fails.</p>
+      <p><b>Sound:</b> footsteps and loud takedowns can be heard. Move deliberately.</p>
+      <p>Desktop: WASD move, J takedown, Space dash, K ability, L gadget.</p>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="screen overlay hidden">
+    <div class="menu-card">
+      <h2>PAUSED</h2>
+      <button class="btn primary big" id="btn-resume">RESUME</button>
+      <button class="btn" id="btn-restart">RESTART SECTOR</button>
+      <button class="btn ghost" id="btn-quit">ABORT TO MENU</button>
+      <button class="btn ghost" id="btn-mute">Sound: ON</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="screen overlay hidden">
+    <div class="menu-card">
+      <div class="result-title" id="result-title">MISSION COMPLETE</div>
+      <div class="result-sub" id="result-sub"></div>
+      <div class="result-stats" id="result-stats"></div>
+      <button class="btn primary big" id="btn-next">NEXT SECTOR ›</button>
+      <button class="btn" id="btn-replay">RETRY</button>
+      <button class="btn ghost" id="btn-results-menu">MENU</button>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
